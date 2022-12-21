@@ -19,8 +19,9 @@ namespace RainMap
 
         public static SpriteBatch SpriteBatch = null!;
 
-        public static Effect RoomLevel = null!;
-        public static Effect DeepWater = null!;
+        public static Effect RoomColor = null!;
+        public static Effect WaterColor = null!;
+        public static Effect WaterSurface = null!;
         public static SpriteFont Consolas10 = null!;
 
         public static Texture2D? Noise;
@@ -71,8 +72,9 @@ namespace RainMap
         {
             SpriteBatch = new(GraphicsDevice);
 
-            RoomLevel = Content.Load<Effect>("RoomLevel");
-            DeepWater = Content.Load<Effect>("DeepWater");
+            RoomColor = Content.Load<Effect>("RoomColor");
+            WaterColor = Content.Load<Effect>("WaterColor");
+            WaterSurface = Content.Load<Effect>("WaterSurface");
             Consolas10 = Content.Load<SpriteFont>("Consolas10");
 
             Pixel = new(GraphicsDevice, 1, 1);
@@ -82,7 +84,7 @@ namespace RainMap
             PixelEffect.Texture = Pixel;
             PixelEffect.TextureEnabled = true;
 
-            RoomLevel.Parameters["_cloudsSpeed"].SetValue(1);
+            RoomColor.Parameters["_cloudsSpeed"].SetValue(1);
 
             Thread dirSelect = new(() =>
             {
@@ -114,8 +116,8 @@ namespace RainMap
 
             float shaderTime = (float)gameTime.TotalGameTime.TotalSeconds / 5;
 
-            RoomLevel?.Parameters["_RAIN"].SetValue(shaderTime);
-            DeepWater?.Parameters["_RAIN"].SetValue(shaderTime);
+            RoomColor?.Parameters["_RAIN"].SetValue(shaderTime);
+            WaterColor?.Parameters["_RAIN"].SetValue(shaderTime);
             PixelEffect.Projection = Projection;
 
             Region?.Update();
@@ -327,9 +329,9 @@ namespace RainMap
                 EffectColors = Texture2D.FromFile(GraphicsDevice, Path.Combine(rwpath, "Assets\\Futile\\Resources\\Palettes\\effectColors.png"));
                 Palettes.SetPalettePath(Path.Combine(rwpath, "Assets\\Futile\\Resources\\Palettes"));
 
-                RoomLevel.Parameters["NoiseTex"].SetValue(Noise);
-                DeepWater.Parameters["NoiseTex"].SetValue(Noise);
-                RoomLevel.Parameters["EffectColors"].SetValue(EffectColors);
+                RoomColor.Parameters["NoiseTex"].SetValue(Noise);
+                WaterColor.Parameters["NoiseTex"].SetValue(Noise);
+                RoomColor.Parameters["EffectColors"].SetValue(EffectColors);
 
                 ThreadPool.QueueUserWorkItem((_) =>
                 {

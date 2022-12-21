@@ -1,6 +1,6 @@
-﻿sampler2D LevelTex : register(s0);
-sampler2D PaletteTex;
-sampler2D FadePaletteTex;
+﻿#include "PaletteShader.fx"
+
+sampler2D LevelTex : register(s0);
 sampler2D NoiseTex;
 sampler2D GrabTex;
 sampler2D EffectColors;
@@ -17,26 +17,12 @@ float _cloudsSpeed;
 
 float EffectColorA;
 float EffectColorB;
-float FadePalette;
 
 struct v2f
 {
     float4 pos : SV_POSITION;
     float2 uv : TEXCOORD0;
 };
-
-float4 SamplePalette(float x, float y)
-{
-    x += 0.5;
-    y += 0.5;
-
-    x /= 32.0;
-    y /= 8.0;
-
-    float2 pos = float2(x, (1 - y) / 2);
-
-    return lerp(tex2D(FadePaletteTex, pos), tex2D(PaletteTex, pos), FadePalette);
-}
 
 float4 frag(v2f i) : COLOR
 {

@@ -1,7 +1,7 @@
+#include "PaletteShader.fx"
+
 sampler2D LevelTex : register(s0);
 sampler2D NoiseTex;
-sampler2D PaletteTex;
-sampler2D FadePaletteTex;
 sampler2D GrabTexture;
 
 float _RAIN;
@@ -9,8 +9,6 @@ float2 _screenOff;
 float2 _screenPos;
 float2 _screenSize;
 float _waterDepth;
-
-float FadePalette;
 
 float4x4 Projection;
 float4 clr;
@@ -22,24 +20,10 @@ struct ShaderData
     float depth : TEXCOORD1;
 };
 
-float4 SamplePalette(float x, float y)
-{
-	x += 0.5;
-	y += 0.5;
-
-	x /= 32.0;
-	y /= 8.0;
-
-	float2 pos = float2(x, (1 - y) / 2);
-
-	return lerp(tex2D(FadePaletteTex, pos), tex2D(PaletteTex, pos), FadePalette);
-}
-
 void MainVS(inout ShaderData data)
 {
 	data.pos = mul(data.pos, Projection);
 }
-
 
 float4 MainPS(ShaderData data, float2 scrPos : VPOS) : COLOR
 {

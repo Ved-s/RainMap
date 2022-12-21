@@ -82,5 +82,10 @@ namespace RainMap
             spriteBatch.DrawString(spriteFont, text, position, color);
         }
 
+        public static void DrawPoint(this SpriteBatch spriteBatch, Vector2 pos, float size, Color color)
+        {
+            spriteBatch.DrawRect(pos - new Vector2(size/2), new Vector2(size), color);
+        }
+
     }
 }

@@ -286,10 +286,9 @@ namespace RainMap
                 && WorldPos.Y + ScreenStart.Y < br.Y
                 && tl.Y < WorldPos.Y + ScreenSize.Y + ScreenStart.Y;
         }
-
         public void Update()
         {
-            if (Water is null)
+            if (Water is null || Main.KeyboardState.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.P))
                 return;
 
             float r = 1 * 0.0045f / (0.0005f * WaterData.TriangleSize);
@@ -299,7 +298,7 @@ namespace RainMap
             float rollBackLength = MathHelper.Lerp(2f, 0f, Settings?.SecondWaveLength ?? 0);
             float rollBackAmp = Settings?.SecondWaveAmplitude ?? 0;
 
-            Water.SinCounter -= waveSpeed;
+            Water.SinCounter -= waveSpeed * .5f;
 
             float num7 = 0f;
             for (int num8 = 0; num8 < Water.Surface.GetLength(0); num8++)
@@ -328,7 +327,7 @@ namespace RainMap
                 //    point.nextHeight += (float)Math.Lerp(-1f, 1f, UnityEngine.Random.value) * this.room.world.rainCycle.ScreenShake * this.room.roomSettings.RumbleIntensity;
                 //}
                 num7 += Water.Surface[num8, 0].height;
-                for (int num9 = 0; num9 < 1; num9++)
+                for (int num9 = 0; num9 < 2; num9++)
                 {
                     float num10 = -(float)num8 * WaterData.TriangleSize / waveLength;
                     Water.Surface[num8, num9].lastPos = Water.Surface[num8, num9].pos;
@@ -363,7 +362,6 @@ namespace RainMap
                 Water.Surface[num14, 0].height = MathHelper.Clamp(num15, -40f, 40f);
             }
         }
-
         public void Draw()
         {
             Rendered = false;
@@ -384,13 +382,11 @@ namespace RainMap
 
             Rendered = true;
         }
-
         public void PrepareDraw()
         {
             Vector4 lightDirAndPixelSize = new(LightAngle.X, LightAngle.Y, 0.0007142857f, 0.00125f);
-            Main.RoomLevel?.Parameters["_lightDirAndPixelSize"].SetValue(lightDirAndPixelSize);
+            Main.RoomColor?.Parameters["_lightDirAndPixelSize"].SetValue(lightDirAndPixelSize);
         }
-
         public void DrawScreen(bool forCapture, int index)
         {
             TextureAsset? texture = CameraScreens[index];
@@ -401,27 +397,64 @@ namespace RainMap
 
             Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
 
-            if (Main.RoomLevel is not null)
+            if (Main.RoomColor is not null)
             {
-                Main.RoomLevel.Parameters["PaletteTex"].SetValue(Palettes.GetPalette(Settings?.Palette ?? 0));
-                Main.RoomLevel.Parameters["FadePaletteTex"].SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
-                Main.RoomLevel.Parameters["FadePalette"].SetValue(1 - Settings?.FadePaletteValues?[index] ?? 1);
+                Main.RoomColor.Parameters["PaletteTex"].SetValue(Palettes.GetPalette(Settings?.Palette ?? 0));
+                Main.RoomColor.Parameters["FadePaletteTex"].SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
+                Main.RoomColor.Parameters["FadePalette"].SetValue(1 - Settings?.FadePaletteValues?[index] ?? 1);
 
                 if (Settings?.EffectColorA is not null)
-                    Main.RoomLevel.Parameters["EffectColorA"].SetValue(Settings.EffectColorA.Value);
+                    Main.RoomColor.Parameters["EffectColorA"].SetValue(Settings.EffectColorA.Value);
 
                 if (Settings?.EffectColorB is not null)
-                    Main.RoomLevel.Parameters["EffectColorB"].SetValue(Settings.EffectColorB.Value);
+                    Main.RoomColor.Parameters["EffectColorB"].SetValue(Settings.EffectColorB.Value);
 
-                Main.RoomLevel.Parameters["_light"].SetValue(MathHelper.Lerp(1, -1, Settings?.Clouds ?? 0));
-                Main.RoomLevel.Parameters["_Grime"].SetValue(Settings?.Grime ?? 0.5f);
-                Main.RoomLevel.CurrentTechnique.Passes[0].Apply();
+                Main.RoomColor.Parameters["_light"].SetValue(MathHelper.Lerp(1, -1, Settings?.Clouds ?? 0));
+                Main.RoomColor.Parameters["_Grime"].SetValue(Settings?.Grime ?? 0.5f);
+                Main.RoomColor.CurrentTechnique.Passes[0].Apply();
             }
             Main.SpriteBatch.Draw(texture.Texture, pos, null, Color.White, 0f, Vector2.Zero, forCapture ? 1 : PanNZoom.Zoom, SpriteEffects.None, 0f);
 
             Main.SpriteBatch.End();
 
             DrawWater(forCapture, index);
+        }
+        public void UpdateScreenSize()
+        {
+            Vector2 max = new(0, 0);
+            for (int i = 0; i < CameraScreens.Length; i++)
+            {
+                max.X = Math.Max(max.X, CameraPositions[i].X + (CameraScreens[i]?.Texture.Width ?? 0));
+                max.Y = Math.Max(max.Y, CameraPositions[i].Y + (CameraScreens[i]?.Texture.Height ?? 0));
+            }
+
+            ScreenSize = max - ScreenStart;
+            Water?.UpdateRoomSizes(ScreenSize.X, CameraScreens.Max(s => s?.Texture.Width ?? 0));
+        }
+
+        public Vector2 GetExitDirection(int index)
+        {
+            Point entrance = RoomExitEntrances[index];
+
+            Vector2 direction = Vector2.Zero;
+
+            for (int i = 0; i < 4; i++)
+            {
+                Point dir = Directions[i];
+                Point tilePos = entrance.Add(dir);
+
+                if (tilePos.X < 0 || tilePos.Y < 0 || tilePos.X >= Size.X || tilePos.Y >= Size.Y)
+                    continue;
+
+                Tile tile = Tiles[tilePos.X, tilePos.Y];
+                if (tile.Terrain != Tile.TerrainType.Solid)
+                    direction -= dir.ToVector2();
+            }
+
+            //if (direction == Vector2.Zero)
+            //    Debugger.Break();
+
+            return direction;
         }
 
         void DrawWater(bool forCapture, int screenIndex)
@@ -462,13 +495,79 @@ namespace RainMap
             float pixLoss = 1 / PanNZoom.Zoom;
             if (pixLoss > 0)
                 vertSkip = pixLoss / WaterData.TriangleSize;
-            
-            int vertexIndex = 0;
 
             //Main.SpriteBatch.Begin();
             ////Main.SpriteBatch.DrawRect(PanNZoom.WorldToScreen(WorldPos + new Vector2(ScreenStart.X, Size.Y * 20 - WaterLevel - Water.Surface[0, 0].pos)), new Vector2(10, WaterLevel + Water.Surface[0, 0].pos) * PanNZoom.Zoom, Color.Lime);
             //Main.SpriteBatch.DrawStringShaded(Main.Consolas10, $"S: {vertSkip}", PanNZoom.WorldToScreen(WorldPos + screenpos), Color.Lime);
             //Main.SpriteBatch.End();
+
+            int vertexIndex = 0;
+
+            for (int j = Math.Max(0, start - 10); j < end + 10; j++)
+            {
+                if (j < end - 1 && j > start && vertSkip > 0)
+                {
+                    vertSkipCounter += 1;
+                    if (vertSkipCounter >= vertSkip)
+                        vertSkipCounter -= vertSkip;
+                    else
+                        continue;
+                }
+
+                if (Water.Surface.GetLength(0) <= j)
+                    continue;
+
+                if (vertexIndex > Water.Vertices.Length - 1)
+                    continue;
+
+                float closePos = Water.Surface[j, 0].pos;
+                float farPos = Water.Surface[j, 1].pos;
+
+                Vector2 close = new();
+                close.Y = Size.Y * 20 - (WaterLevel + closePos);
+                close.X = j * WaterData.TriangleSize + ScreenStart.X;
+
+                Vector2 far = new();
+                far.Y = Size.Y * 20 - (WaterLevel + farPos);
+                far.X = j * WaterData.TriangleSize + ScreenStart.X;
+
+                far = ApplyDepthOnVector(far, ScreenSize * new Vector2(.5f, 0.5f), 30);
+
+                if (far.Y > close.Y)
+                    far.Y = close.Y;
+
+                if (j == start || j == end - 1)
+                    far.X = j * WaterData.TriangleSize + ScreenStart.X;
+
+                Vector2 closeTexPos = (close - screenpos) / screensize;
+                Vector2 farTexPos = (far - screenpos) / screensize;
+
+                Water.Vertices[vertexIndex + 1].Position = far;
+                Water.Vertices[vertexIndex + 1].TextureCoord = farTexPos;
+                Water.Vertices[vertexIndex + 1].Depth = 1;
+
+                Water.Vertices[vertexIndex].Position = close;
+                Water.Vertices[vertexIndex].TextureCoord = closeTexPos;
+                Water.Vertices[vertexIndex].Depth = 0;
+
+                vertexIndex += 2;
+            }
+
+            if (vertexIndex > 3)
+            {
+                Main.WaterSurface.Parameters["LevelTex"].SetValue(CameraScreens[screenIndex]!.Texture);
+                Main.WaterSurface.Parameters["Projection"].SetValue(roomMatrix);
+                Main.WaterSurface.Parameters["PaletteTex"].SetValue(Palettes.GetPalette(Settings?.Palette ?? 0));
+                Main.WaterSurface.Parameters["FadePaletteTex"].SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
+                Main.WaterSurface.Parameters["FadePalette"].SetValue(1 - Settings?.FadePaletteValues?[screenIndex] ?? 1);
+                Main.WaterSurface.Parameters["_waterDepth"].SetValue(WaterInFrontOfTerrain ? 0 : 1f / 30);
+
+                Main.Instance.GraphicsDevice.SamplerStates[0] = SamplerState.PointClamp;
+                Main.WaterSurface.CurrentTechnique.Passes[0].Apply();
+                Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, Water.Vertices, 0, vertexIndex - 2);
+            }
+            vertSkipCounter = 0;
+            vertexIndex = 0;
 
             for (int j = start; j < end; j++)
             {
@@ -510,67 +609,41 @@ namespace RainMap
                 vertexIndex += 2;
             }
 
-            if (vertexIndex < 3)
-                return;
+            if (vertexIndex > 3)
+            {
 
-            Main.DeepWater.Parameters["LevelTex"].SetValue(CameraScreens[screenIndex]!.Texture);
-            Main.DeepWater.Parameters["Projection"].SetValue(roomMatrix);
-            Main.DeepWater.Parameters["PaletteTex"].SetValue(Palettes.GetPalette(Settings?.Palette ?? 0));
-            Main.DeepWater.Parameters["FadePaletteTex"].SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
-            Main.DeepWater.Parameters["FadePalette"].SetValue(1 - Settings?.FadePaletteValues?[screenIndex] ?? 1);
+                Main.WaterColor.Parameters["LevelTex"].SetValue(CameraScreens[screenIndex]!.Texture);
+                Main.WaterColor.Parameters["Projection"].SetValue(roomMatrix);
+                Main.WaterColor.Parameters["PaletteTex"].SetValue(Palettes.GetPalette(Settings?.Palette ?? 0));
+                Main.WaterColor.Parameters["FadePaletteTex"].SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
+                Main.WaterColor.Parameters["FadePalette"].SetValue(1 - Settings?.FadePaletteValues?[screenIndex] ?? 1);
 
-            Vector2 spriteSize = screensize * PanNZoom.Zoom;
+                Vector2 spriteSize = screensize * PanNZoom.Zoom;
 
-            // For some reason, on-screen sprite position is flipped in shader here if not capturing
-            if (!forCapture)
-                spriteSize *= new Vector2(1, -1);
+                // For some reason, on-screen sprite position is flipped in shader here if not capturing
+                if (!forCapture)
+                    spriteSize *= new Vector2(1, -1);
 
-            Main.DeepWater.Parameters["_screenOff"].SetValue(CameraPositions[screenIndex] / (Main.Noise?.Bounds.Size.ToVector2() ?? Vector2.One));
-            Main.DeepWater.Parameters["_screenSize"].SetValue(forCapture ? screensize : spriteSize);
-            Main.DeepWater.Parameters["_waterDepth"].SetValue(WaterInFrontOfTerrain ? 0 : 1f / 30);
+                Main.WaterColor.Parameters["_screenOff"].SetValue(CameraPositions[screenIndex] / (Main.Noise?.Bounds.Size.ToVector2() ?? Vector2.One));
+                Main.WaterColor.Parameters["_screenSize"].SetValue(forCapture ? screensize : spriteSize);
+                Main.WaterColor.Parameters["_waterDepth"].SetValue(WaterInFrontOfTerrain ? 0 : 1f / 30);
 
-            Main.DeepWater.CurrentTechnique.Passes[0].Apply();
+                Main.WaterColor.CurrentTechnique.Passes[0].Apply();
 
-            Main.Instance.GraphicsDevice.SamplerStates[0] = SamplerState.PointClamp;
-            Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, Water.Vertices, 0, vertexIndex - 2);
+                Main.Instance.GraphicsDevice.SamplerStates[0] = SamplerState.PointClamp;
+                Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, Water.Vertices, 0, vertexIndex - 2);
+            }
         }
 
-        public void UpdateScreenSize()
+        // I have no idea what that does
+        static Vector2 ApplyDepthOnVector(Vector2 v, Vector2 depthPoint, float d)
         {
-            Vector2 max = new(0, 0);
-            for (int i = 0; i < CameraScreens.Length; i++)
-            {
-                max.X = Math.Max(max.X, CameraPositions[i].X + (CameraScreens[i]?.Texture.Width ?? 0));
-                max.Y = Math.Max(max.Y, CameraPositions[i].Y + (CameraScreens[i]?.Texture.Height ?? 0));
-            }
-
-            ScreenSize = max - ScreenStart;
-            Water?.UpdateRoomSizes(ScreenSize.X, CameraScreens.Max(s => s?.Texture.Width ?? 0));
-        }
-
-        public Vector2 GetExitDirection(int index)
-        {
-            Point entrance = RoomExitEntrances[index];
-
-            Vector2 direction = Vector2.Zero;
-
-            for (int i = 0; i < 4; i++)
-            {
-                Point dir = Directions[i];
-                Point tilePos = entrance.Add(dir);
-
-                if (tilePos.X < 0 || tilePos.Y < 0 || tilePos.X >= Size.X || tilePos.Y >= Size.Y)
-                    continue;
-
-                Tile tile = Tiles[tilePos.X, tilePos.Y];
-                if (tile.Terrain != Tile.TerrainType.Solid)
-                    direction -= dir.ToVector2();
-            }
-
-            //if (direction == Vector2.Zero)
-            //    Debugger.Break();
-
-            return direction;
+            d *= -0.025f;
+            v -= depthPoint;
+            d = (10f - d) * 0.1f;
+            v /= d;
+            v += depthPoint;
+            return v;
         }
 
         public override string ToString()
@@ -634,11 +707,14 @@ namespace RainMap
 
             public void UpdateRoomSizes(float roomWidth, float maxScreenWidth)
             {
-                Surface = new SurfacePoint[(int)(roomWidth / TriangleSize + 2), 1];
+                Surface = new SurfacePoint[(int)(roomWidth / TriangleSize + 2), 2];
                 Vertices = new WaterVertex[(int)(maxScreenWidth / TriangleSize + 4) * 2];
 
                 for (int i = 0; i < Surface.GetLength(0); i++)
+                {
                     Surface[i, 0] = new SurfacePoint();
+                    Surface[i, 1] = new SurfacePoint();
+                }
             }
 
             public class SurfacePoint

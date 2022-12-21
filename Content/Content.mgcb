@@ -20,15 +20,27 @@
 /processorParam:TextureFormat=Compressed
 /build:Consolas10.spritefont
 
-#begin DeepWater.fx
+#begin RoomColor.fx
 /importer:EffectImporter
 /processor:EffectProcessor
 /processorParam:DebugMode=Auto
-/build:DeepWater.fx
+/build:RoomColor.fx
 
-#begin RoomLevel.fx
+#begin WaterColor.fx
 /importer:EffectImporter
 /processor:EffectProcessor
 /processorParam:DebugMode=Auto
-/build:RoomLevel.fx
+/build:WaterColor.fx
+
+#begin WaterSurface.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:WaterSurface.fx
+
+#begin WaterSurface.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:WaterSurface.fx
 
