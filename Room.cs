@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace RainMap
 {
@@ -466,23 +467,30 @@ namespace RainMap
                 if (Water.Surface.GetLength(0) <= j)
                     continue;
 
-                WaterData.SurfacePoint point = Water.Surface[j, 0];
-
-                float vertY = point.pos + Size.Y * 20 - WaterLevel;
-                float vertX = j * WaterData.TriangleSize + ScreenStart.X;
-
                 int vi = (j - start) * 2;
 
                 if (vi < 0 || vi > Water.Vertices.Length - 1)
                     continue;
 
-                Water.Vertices[vi + 1].Position = new Vector3(vertX, vertY, 0);
-                Water.Vertices[vi].Position = new Vector3(vertX, screensize.Y + screenpos.Y, 0);
+                WaterData.SurfacePoint point = Water.Surface[j, 0];
 
-                // TEXCOORD is water depth (0 - bottom)
+                Vector2 vertPos = new();
+                vertPos.Y = point.pos + Size.Y * 20 - WaterLevel;
+                vertPos.X = j * WaterData.TriangleSize + ScreenStart.X;
 
-                Water.Vertices[vi + 1].TextureCoordinate = Vector2.One;
-                Water.Vertices[vi].TextureCoordinate = new Vector2(1 - (screenpos.Y + screensize.Y) / ScreenSize.Y);
+                Vector2 texPos = (vertPos - screenpos) / screensize;
+
+                // position in room
+                // texture uv
+                // water depth (0 - bottom)
+
+                Water.Vertices[vi + 1].Position = vertPos;
+                Water.Vertices[vi + 1].TextureCoord = texPos;
+                Water.Vertices[vi + 1].Depth = 1;
+
+                Water.Vertices[vi].Position = new Vector2(vertPos.X, screensize.Y + screenpos.Y);
+                Water.Vertices[vi].TextureCoord = new Vector2(texPos.X, 1);
+                Water.Vertices[vi].Depth = 1 - (screenpos.Y + screensize.Y) / ScreenSize.Y;
 
                 verts += 2;
             }
@@ -496,17 +504,13 @@ namespace RainMap
             Main.DeepWater.Parameters["FadePaletteTex"].SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
             Main.DeepWater.Parameters["FadePalette"].SetValue(1 - Settings?.FadePaletteValues?[screenIndex] ?? 1);
 
-            
             Vector2 spriteSize = screensize * PanNZoom.Zoom;
 
             // For some reason, on-screen sprite position is flipped in shader here if not capturing
             if (!forCapture)
                 spriteSize *= new Vector2(1, -1);
-            Vector2 spritePos = PanNZoom.WorldToScreen(WorldPos + CameraPositions[screenIndex]);
-            spritePos.Y = Main.Instance.GraphicsDevice.Viewport.Height - spritePos.Y;
 
             Main.DeepWater.Parameters["_screenOff"].SetValue(CameraPositions[screenIndex] / (Main.Noise?.Bounds.Size.ToVector2() ?? Vector2.One));
-            Main.DeepWater.Parameters["_screenPos"].SetValue(forCapture ? Vector2.Zero : spritePos);
             Main.DeepWater.Parameters["_screenSize"].SetValue(forCapture ? screensize : spriteSize);
             Main.DeepWater.Parameters["_waterDepth"].SetValue(WaterInFrontOfTerrain ? 0 : 1f / 30);
 
@@ -583,12 +587,28 @@ namespace RainMap
             }
         }
 
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct WaterVertex : IVertexType
+        {
+            public Vector2 Position;
+            public Vector2 TextureCoord;
+            public float Depth;
+
+            public VertexDeclaration VertexDeclaration => Declaration;
+            static VertexDeclaration Declaration = new(new VertexElement[] 
+            {
+                new(0, VertexElementFormat.Vector2, VertexElementUsage.Position, 0),
+                new(8, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 0),
+                new(16, VertexElementFormat.Single, VertexElementUsage.TextureCoordinate, 1),
+            });
+        }
+
         public class WaterData
         {
             public const float TriangleSize = 20;
 
             public SurfacePoint[,] Surface = null!;
-            public VertexPositionTexture[] Vertices = null!;
+            public WaterVertex[] Vertices = null!;
             public float SinCounter = 0;
 
             public WaterData(float roomWidth, float maxScreenWidth)
@@ -599,7 +619,7 @@ namespace RainMap
             public void UpdateRoomSizes(float roomWidth, float maxScreenWidth)
             {
                 Surface = new SurfacePoint[(int)(roomWidth / TriangleSize + 2), 1];
-                Vertices = new VertexPositionTexture[(int)(maxScreenWidth / TriangleSize + 4) * 2];
+                Vertices = new WaterVertex[(int)(maxScreenWidth / TriangleSize + 4) * 2];
 
                 for (int i = 0; i < Surface.GetLength(0); i++)
                     Surface[i, 0] = new SurfacePoint();
