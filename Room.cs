@@ -378,7 +378,8 @@ namespace RainMap
 
             Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
             Vector2 nameSize = Main.Consolas10.MeasureString(Name);
-            Main.SpriteBatch.DrawString(Main.Consolas10, Name, PanNZoom.WorldToScreen(WorldPos + new Vector2(ScreenSize.X / 2, 0)) - new Vector2(nameSize.X / 2, 0), Color.Yellow);
+            Vector2 namePos = PanNZoom.WorldToScreen(WorldPos + ScreenStart + new Vector2(ScreenSize.X / 2, 0)) - new Vector2(nameSize.X / 2, 0);
+            Main.SpriteBatch.DrawStringShaded(Main.Consolas10, Name, namePos, Color.Yellow);
             Main.SpriteBatch.End();
 
             Rendered = true;
@@ -425,13 +426,7 @@ namespace RainMap
 
         void DrawWater(bool forCapture, int screenIndex)
         {
-            //if (Name == "SL_D06" && screenIndex == 3)
-            //    Debugger.Break();
-
-            if (Water is null)
-                return;
-
-            if (CameraScreens[screenIndex] is null)
+            if (Water is null || CameraScreens[screenIndex] is null)
                 return;
 
             Vector2 screenpos = CameraPositions[screenIndex];
@@ -460,22 +455,42 @@ namespace RainMap
             if (start == end)
                 return;
 
-            int verts = 0;
+            // skip {vertSkip} vertices when camera is too far
+            float vertSkip = 0;
+            float vertSkipCounter = 0;
+
+            float pixLoss = 1 / PanNZoom.Zoom;
+            if (pixLoss > 0)
+                vertSkip = pixLoss / WaterData.TriangleSize;
+            
+            int vertexIndex = 0;
+
+            //Main.SpriteBatch.Begin();
+            ////Main.SpriteBatch.DrawRect(PanNZoom.WorldToScreen(WorldPos + new Vector2(ScreenStart.X, Size.Y * 20 - WaterLevel - Water.Surface[0, 0].pos)), new Vector2(10, WaterLevel + Water.Surface[0, 0].pos) * PanNZoom.Zoom, Color.Lime);
+            //Main.SpriteBatch.DrawStringShaded(Main.Consolas10, $"S: {vertSkip}", PanNZoom.WorldToScreen(WorldPos + screenpos), Color.Lime);
+            //Main.SpriteBatch.End();
 
             for (int j = start; j < end; j++)
             {
+                if (j < end - 1 && j > start && vertSkip > 0)
+                {
+                    vertSkipCounter += 1;
+                    if (vertSkipCounter >= vertSkip)
+                        vertSkipCounter -= vertSkip;
+                    else
+                        continue;
+                }
+
                 if (Water.Surface.GetLength(0) <= j)
                     continue;
 
-                int vi = (j - start) * 2;
-
-                if (vi < 0 || vi > Water.Vertices.Length - 1)
+                if (vertexIndex > Water.Vertices.Length - 1)
                     continue;
 
                 WaterData.SurfacePoint point = Water.Surface[j, 0];
 
                 Vector2 vertPos = new();
-                vertPos.Y = point.pos + Size.Y * 20 - WaterLevel;
+                vertPos.Y = Size.Y * 20 - (WaterLevel + point.pos);
                 vertPos.X = j * WaterData.TriangleSize + ScreenStart.X;
 
                 Vector2 texPos = (vertPos - screenpos) / screensize;
@@ -484,18 +499,18 @@ namespace RainMap
                 // texture uv
                 // water depth (0 - bottom)
 
-                Water.Vertices[vi + 1].Position = vertPos;
-                Water.Vertices[vi + 1].TextureCoord = texPos;
-                Water.Vertices[vi + 1].Depth = 1;
+                Water.Vertices[vertexIndex + 1].Position = vertPos;
+                Water.Vertices[vertexIndex + 1].TextureCoord = texPos;
+                Water.Vertices[vertexIndex + 1].Depth = 1;
 
-                Water.Vertices[vi].Position = new Vector2(vertPos.X, screensize.Y + screenpos.Y);
-                Water.Vertices[vi].TextureCoord = new Vector2(texPos.X, 1);
-                Water.Vertices[vi].Depth = 1 - (screenpos.Y + screensize.Y) / ScreenSize.Y;
+                Water.Vertices[vertexIndex].Position = new Vector2(vertPos.X, screensize.Y + screenpos.Y);
+                Water.Vertices[vertexIndex].TextureCoord = new Vector2(texPos.X, 1);
+                Water.Vertices[vertexIndex].Depth = 1 - (screenpos.Y + screensize.Y) / ScreenSize.Y;
 
-                verts += 2;
+                vertexIndex += 2;
             }
 
-            if (verts < 3)
+            if (vertexIndex < 3)
                 return;
 
             Main.DeepWater.Parameters["LevelTex"].SetValue(CameraScreens[screenIndex]!.Texture);
@@ -516,7 +531,8 @@ namespace RainMap
 
             Main.DeepWater.CurrentTechnique.Passes[0].Apply();
 
-            Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, Water.Vertices, 0, verts - 2);
+            Main.Instance.GraphicsDevice.SamplerStates[0] = SamplerState.PointClamp;
+            Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, Water.Vertices, 0, vertexIndex - 2);
         }
 
         public void UpdateScreenSize()
@@ -605,7 +621,7 @@ namespace RainMap
 
         public class WaterData
         {
-            public const float TriangleSize = 20;
+            public const float TriangleSize = 10;
 
             public SurfacePoint[,] Surface = null!;
             public WaterVertex[] Vertices = null!;
