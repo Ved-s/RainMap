@@ -24,8 +24,6 @@ namespace RainMap
 
         public Color? BackgroundColor;
 
-        SixLabors.ImageSharp.PointF[] LinePoints = new SixLabors.ImageSharp.PointF[2];
-
         public static Region Load(string path)
         {
             string regionId = Path.GetFileName(path);
@@ -202,12 +200,12 @@ namespace RainMap
                 room.Update();
         }
 
-        public void Draw()
+        public void Draw(Renderer renderer)
         {
             foreach (Room room in Rooms)
-                room.Draw();
+                room.Draw(renderer);
 
-            DrawConnections(null, Vector2.Zero);   
+            DrawConnections(renderer);   
         }
 
         public bool TryGetRoom(string name, [NotNullWhen(true)] out Room? room)
@@ -216,12 +214,11 @@ namespace RainMap
             return room is not null;
         }
 
-        public void DrawConnections(IImageProcessingContext? image, Vector2 worldOffset)
+        public void DrawConnections(Renderer renderer)
         {
             DrawnRoomConnections.Clear();
 
-            if (image is null)
-                Main.SpriteBatch.Begin();
+            Main.SpriteBatch.Begin();
 
             for (int i = 0; i < Rooms.Count; i++)
             {
@@ -231,23 +228,16 @@ namespace RainMap
 
                 foreach (var connection in room.Connections)
                 {
-                    if (DrawnRoomConnections.Contains(connection.Target.Name) || image is null && !room.Rendered && !connection.Target.Rendered)
+                    if (DrawnRoomConnections.Contains(connection.Target.Name) || !room.Rendered && !connection.Target.Rendered)
                         continue;
 
-                    Vector2 start = room.RoomExitEntrances[connection.Exit].ToVector2() * 20 + new Vector2(10) + room.WorldPos + worldOffset;
-                    Vector2 end = connection.Target.RoomExitEntrances[connection.TargetExit].ToVector2() * 20 + new Vector2(10) + connection.Target.WorldPos + worldOffset;
+                    Vector2 start = room.RoomExitEntrances[connection.Exit].ToVector2() * 20 + new Vector2(10) + room.WorldPos;
+                    Vector2 end = connection.Target.RoomExitEntrances[connection.TargetExit].ToVector2() * 20 + new Vector2(10) + connection.Target.WorldPos;
 
                     float maxDist = (start - end).Length() / 2;
-                    float scale = image is null ? PanNZoom.Zoom : 1f;
 
-                    Vector2 startDir = room.GetExitDirection(connection.Exit) * Math.Min(maxDist, 1000) * scale;
-                    Vector2 endDir = connection.Target.GetExitDirection(connection.TargetExit) * Math.Min(maxDist, 1000) * scale;
-
-                    if (image is null)
-                    {
-                        start = PanNZoom.WorldToScreen(start);
-                        end = PanNZoom.WorldToScreen(end);
-                    }
+                    Vector2 startDir = room.GetExitDirection(connection.Exit) * Math.Min(maxDist, 1000);
+                    Vector2 endDir = connection.Target.GetExitDirection(connection.TargetExit) * Math.Min(maxDist, 1000);
 
                     if (startDir == Vector2.Zero)
                         startDir = (end - start) / 5;
@@ -255,33 +245,20 @@ namespace RainMap
                     if (endDir == Vector2.Zero)
                         endDir = (start - end) / 5;
 
-                    DrawConnection(start, startDir, end, endDir, image);
+                    DrawConnection(start, startDir, end, endDir, renderer);
                 }
                 DrawnRoomConnections.Add(room.Name);
             }
-            if (image is null)
-                Main.SpriteBatch.End();
+            Main.SpriteBatch.End();
         }
 
-        void DrawConnection(Vector2 start, Vector2 startDir, Vector2 end, Vector2 endDir, IImageProcessingContext? image)
+        void DrawConnection(Vector2 start, Vector2 startDir, Vector2 end, Vector2 endDir, Renderer renderer)
         {
-            SixLabors.ImageSharp.Color slCOlor = SixLabors.ImageSharp.Color.White;
-            float scale = PanNZoom.Zoom;
+            renderer.DrawRect(start - new Vector2(2) / renderer.Scale, new Vector2(4) / renderer.Scale, Color.White);
+            renderer.DrawRect(end - new Vector2(2) / renderer.Scale, new Vector2(4) / renderer.Scale, Color.White);
 
-            if (image is null)
-            {
-                Main.SpriteBatch.Draw(Main.Pixel, start, new Rectangle(0, 0, 4, 4), Color.White, 0f, new Vector2(2), 1, SpriteEffects.None, 0);
-                Main.SpriteBatch.Draw(Main.Pixel, end, new Rectangle(0, 0, 4, 4), Color.White, 0f, new Vector2(2), 1, SpriteEffects.None, 0);
-            }
-            else 
-            {
-                image.Fill(slCOlor, new SixLabors.ImageSharp.RectangleF(start.X - 3, start.Y - 3, 6, 6));
-                image.Fill(slCOlor, new SixLabors.ImageSharp.RectangleF(end.X - 3, end.Y - 3, 6, 6));
-                scale = 0.75f;
-            }
-
-            float lineLength = 30 * scale;
-            float tFac = 1f / (100 * scale);
+            float lineLength = 30 * renderer.Scale;
+            float tFac = 1f / (100 * renderer.Scale);
 
             tFac = MathHelper.Clamp(tFac, 0.01f, 0.3f);
 
@@ -294,58 +271,48 @@ namespace RainMap
             bool alternator = false;
             float? tLastOff = null;
 
-            if (image is not null)
-                lengthOff = 0;
-            
             float t = 0;
 
             while (t < 1)
             {
                 Vector2 velocity = Drawing.CalcCubicBezier1(a, b, c, d, t) * tFac;
-                float bezLength = velocity.Length();
+                float bezLength = velocity.Length() * renderer.Scale;
 
                 if (bezLength == 0)
                 {
                     t += 0.01f;
                     continue;
                 }
-            
+
                 float tOff = tFac * (lengthOff - lineLength) / bezLength;
-            
+
                 float lenFac = lineLength / bezLength;
-            
+
                 if (!tLastOff.HasValue)
                     tLastOff = tOff;
 
                 bool once = false;
-            
+
                 for (float len = 0; len < bezLength; len += lineLength)
                 {
                     if (t - tOff > 1 && once)
                         break;
-            
+
                     once = true;
-            
+
                     alternator = !alternator;
                     float tNext = t + tFac * lenFac;
-            
+
                     if (alternator)
                     {
                         Vector2 lineA = Drawing.CalcCubicBezier0(a, b, c, d, MathHelper.Clamp(t + tLastOff.Value, 0, 1));
                         Vector2 lineB = Drawing.CalcCubicBezier0(a, b, c, d, MathHelper.Clamp(tNext + tOff, 0, 1));
 
-                        if (image is null)
-                            Main.SpriteBatch.DrawLine(lineA, lineB, Color.White, 2);
-                        else
-                        {
-                            LinePoints[0] = new(lineA.X, lineA.Y);
-                            LinePoints[1] = new(lineB.X, lineB.Y);
-                            image.DrawLines(slCOlor, 3, LinePoints);
-                        }
+                        renderer.DrawLine(lineA, lineB, Color.White, 2);
                     }
                     t = tNext;
-            
-                    tLastOff = tOff;       
+
+                    tLastOff = tOff;
 
                 }
             }

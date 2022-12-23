@@ -5,6 +5,8 @@ sampler2D NoiseTex;
 sampler2D GrabTex;
 sampler2D EffectColors;
 
+float4x4 Projection;
+
 float _RAIN;
 float _light = 0;
 float4 _spriteRect;
@@ -18,13 +20,18 @@ float _cloudsSpeed;
 float EffectColorA;
 float EffectColorB;
 
-struct v2f
+struct ShaderData
 {
-    float4 pos : SV_POSITION;
+    float4 pos : POSITION0;
     float2 uv : TEXCOORD0;
 };
 
-float4 frag(v2f i) : COLOR
+void MainVS(inout ShaderData data)
+{
+    data.pos = mul(data.pos, Projection);
+}
+
+float4 MainPS(ShaderData i) : COLOR
 {
     //float rand = frac(sin(dot(i.uv.x, 12.98232)+_RAIN-i.uv.y) * 43758.5453);
     float4 setColor = float4(0.0, 0.0, 0.0, 1.0);
@@ -50,8 +57,8 @@ float4 frag(v2f i) : COLOR
     }
     else
     {
-        float red = texcol.x * 255;
-        float green = texcol.y * 255;
+        int red = texcol.x * 255;
+        int green = texcol.y * 255;
 
         float effectCol = 0;
         float notFloorDark = 1;
@@ -80,9 +87,9 @@ float4 frag(v2f i) : COLOR
         else
             shadow = 1.0;
 
-        float paletteColor = clamp(floor(red / 30.0), 0, 2); //some distant objects want to get palette color 3, so we clamp it
+        float paletteColor = clamp(floor(red / 30), 0, 2); //some distant objects want to get palette color 3, so we clamp it
 
-        red = fmod(red, 30.0);
+        red = red % 30;
 
         if (shadow != 1 && red >= 5)
         {
@@ -162,6 +169,7 @@ technique Main
 {
     pass Main
     {
-        PixelShader = compile ps_3_0 frag();
+        VertexShader = compile vs_3_0 MainVS();
+        PixelShader = compile ps_3_0 MainPS();
     }
 }

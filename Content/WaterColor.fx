@@ -23,6 +23,9 @@ struct ShaderData
 void MainVS(inout ShaderData data)
 {
 	data.pos = mul(data.pos, Projection);
+
+	// Previewer compatibility
+	//data.depth = 1-data.uv.y;
 }
 
 float4 MainPS(ShaderData data, float2 scrPos : VPOS) : COLOR
@@ -41,7 +44,9 @@ float4 MainPS(ShaderData data, float2 scrPos : VPOS) : COLOR
 	float plrLightDst = clamp(distance(float2(0,0),  float2((scrPos.x - clr.x)*(_screenSize.x/_screenSize.y), scrPos.y - clr.y))*lerp(21, 8, clr.z), 0, 1);
 
 
-	float grad = fmod((texcol.x * 255), 30.0)/30.0;
+	int red = texcol.x * 255;
+
+	float grad = (red % 30.0)/30.0;
 	
 	plrLightDst = clamp(plrLightDst + pow(1.0-grad, 3), 0, 1);
 	
@@ -72,7 +77,9 @@ float4 MainPS(ShaderData data, float2 scrPos : VPOS) : COLOR
 	else
 		grabColor = float4(0,0,0,1);
 
-	if(fmod((tex2D(LevelTex, data.uv).x*255), 30.0)<_waterDepth*31.0) return float4(0, 0, 0, 0);
+	red = tex2D(LevelTex, data.uv).x*255;
+
+	if(red % 30.0 < _waterDepth * 31.0) return float4(0, 0, 0, 0);
 	
     grad = pow(grad, clamp(1 - pow(data.depth, 10), 0.5, 1)) * data.depth;
 	

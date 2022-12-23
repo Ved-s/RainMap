@@ -27,6 +27,7 @@ namespace RainMap
         public static Texture2D? Noise;
         public static Texture2D? EffectColors;
         public static Texture2D Pixel = null!;
+        public static Texture2D Transparent = null!;
 
         public static Region? Region;
         public static Matrix Projection;
@@ -39,6 +40,8 @@ namespace RainMap
         public static MouseState MouseState;
         public static KeyboardState OldKeyboardState;
         public static KeyboardState KeyboardState;
+
+        public static CameraRenderer WorldCamera = null!;
 
         static Stopwatch DrawTineWatch = new();
         static int FPS;
@@ -71,6 +74,7 @@ namespace RainMap
         protected override void LoadContent()
         {
             SpriteBatch = new(GraphicsDevice);
+            WorldCamera = new(SpriteBatch);
 
             RoomColor = Content.Load<Effect>("RoomColor");
             WaterColor = Content.Load<Effect>("WaterColor");
@@ -80,11 +84,16 @@ namespace RainMap
             Pixel = new(GraphicsDevice, 1, 1);
             Pixel.SetData(new[] { Color.White });
 
+            Transparent = new(GraphicsDevice, 1, 1);
+            Transparent.SetData(new[] { Color.Transparent });
+
             PixelEffect = new(GraphicsDevice);
             PixelEffect.Texture = Pixel;
             PixelEffect.TextureEnabled = true;
 
-            RoomColor.Parameters["_cloudsSpeed"].SetValue(1);
+            RoomColor.Parameters["_cloudsSpeed"]?.SetValue(1);
+            RoomColor.Parameters["GrabTex"]?.SetValue(Transparent);
+            WaterColor.Parameters["GrabTexture"]?.SetValue(Transparent);
 
             Thread dirSelect = new(() =>
             {
@@ -121,7 +130,7 @@ namespace RainMap
             PixelEffect.Projection = Projection;
 
             Region?.Update();
-            Vector2 worldPos = PanNZoom.ScreenToWorld(MouseState.Position.ToVector2());
+            Vector2 worldPos = WorldCamera.InverseTransformVector(MouseState.Position.ToVector2());
 
             bool drag = IsActive && MouseState.LeftButton == ButtonState.Pressed;
             bool oldDrag = OldMouseState.LeftButton == ButtonState.Pressed;
@@ -178,7 +187,7 @@ namespace RainMap
             }
 
             if (IsActive)
-                PanNZoom.Update();
+                WorldCamera.Update();
 
             if (KeyboardState.IsKeyDown(Keys.F7) && OldKeyboardState.IsKeyUp(Keys.F7))
             {
@@ -246,7 +255,6 @@ namespace RainMap
                     capResult.Dispose();
                     GC.Collect();
                 }
-                
             }
 
             DrawTineWatch.Restart();
@@ -261,17 +269,12 @@ namespace RainMap
                     if (screenTex?.Loaded is null or false)
                         continue;
 
-                    Vector2 pos = PanNZoom.WorldToScreen(r.WorldPos + r.CameraPositions[i]);
-                    pos -= new Vector2(2);
-                    Vector2 size = screenTex.Texture.Size() * PanNZoom.Zoom;
-                    size += new Vector2(4);
-
-                    SpriteBatch.DrawRect(pos, size, Color.White * 0.4f);
+                    WorldCamera.DrawRect(r.WorldPos + r.CameraPositions[i] - new Vector2(2) / WorldCamera.Scale, screenTex.Texture.Size() + new Vector2(4) / WorldCamera.Scale, Color.White * 0.4f);
                 }
             }
             SpriteBatch.End();
 
-            Region?.Draw();
+            Region?.Draw(WorldCamera);
 
             if (SelectedRooms.Count == 1)
             {
@@ -279,21 +282,21 @@ namespace RainMap
 
                 Room r = SelectedRooms.First();
 
-                SpriteBatch.DrawRect(PanNZoom.WorldToScreen(r.WorldPos), r.Size.ToVector2() * 20 * PanNZoom.Zoom, null, Color.Lime * 0.3f);
-                SpriteBatch.DrawRect(PanNZoom.WorldToScreen(r.WorldPos + r.ScreenStart), r.ScreenSize * PanNZoom.Zoom, null, Color.Red * 0.3f);
+                WorldCamera.DrawRect(r.WorldPos, r.Size.ToVector2() * 20, null, Color.Lime * 0.3f);
+                WorldCamera.DrawRect(r.WorldPos + r.ScreenStart, r.ScreenSize, null, Color.Red * 0.3f);
                 SpriteBatch.End();
             }
 
             if (Selecting)
             {
                 SpriteBatch.Begin();
-                Vector2 a = PanNZoom.WorldToScreen(OldDragPos);
-                Vector2 b = Mouse.GetState().Position.ToVector2();
+                Vector2 a = OldDragPos;
+                Vector2 b = WorldCamera.InverseTransformVector(MouseState.Position.ToVector2());
 
                 Vector2 tl = new(Math.Min(a.X, b.X), Math.Min(a.Y, b.Y));
                 Vector2 br = new(Math.Max(a.X, b.X), Math.Max(a.Y, b.Y));
 
-                SpriteBatch.Draw(Pixel, tl, null, Color.LightBlue * 0.2f, 0f, Vector2.Zero, br - tl, SpriteEffects.None, 0);
+                WorldCamera.DrawRect(tl, br - tl, Color.LightBlue * 0.2f);
                 SpriteBatch.End();
             }
 
@@ -306,6 +309,12 @@ namespace RainMap
                 FPS = FPSCounter;
                 FPSCounter = 0;
             }
+        }
+
+        protected override void OnExiting(object sender, EventArgs args)
+        {
+            base.OnExiting(sender, args);
+            TextureLoader.Finish();
         }
 
         public void LoadRegion(string path)

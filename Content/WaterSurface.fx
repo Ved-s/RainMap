@@ -24,7 +24,8 @@ float4 MainPS(ShaderData data) : COLOR
     
     float4 texcol = tex2D(LevelTex, data.uv);
     
-    float red = fmod((texcol.x * 255), 30.0);
+    int ired = texcol.x * 255;
+    float red = ired % 30;
 
     if (texcol.x != 1.0 || texcol.y != 1.0 || texcol.z != 1.0)
         if (red < _waterDepth * 31 || red / 30.0 < data.depth) // + lerp(0.02, -0.075, 1.0 - _waterDepth * 31.0))

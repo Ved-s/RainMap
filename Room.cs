@@ -196,7 +196,7 @@ namespace RainMap
                         {
                             Point dirVal = Directions[dir.Value];
 
-                            Point testTilePos = pos.Add(dirVal);
+                            Point testTilePos = pos + dirVal;
 
                             if (testTilePos.X < 0 || testTilePos.Y < 0 || testTilePos.X >= room.Size.X || testTilePos.Y >= room.Size.Y)
                             {
@@ -216,7 +216,7 @@ namespace RainMap
                         for (int j = 0; j < 4; j++)
                         {
                             Point dirVal = Directions[j];
-                            Point testTilePos = pos.Add(dirVal);
+                            Point testTilePos = pos + dirVal;
 
                             if (testTilePos == lastPos || testTilePos.X < 0 || testTilePos.Y < 0 || testTilePos.X >= room.Size.X || testTilePos.Y >= room.Size.Y)
                                 continue;
@@ -362,21 +362,21 @@ namespace RainMap
                 Water.Surface[num14, 0].height = MathHelper.Clamp(num15, -40f, 40f);
             }
         }
-        public void Draw()
+        public void Draw(Renderer renderer)
         {
             Rendered = false;
 
-            if (!IntersectsWith(PanNZoom.ScreenToWorld(Vector2.Zero), PanNZoom.ScreenToWorld(Main.Instance.GraphicsDevice.Viewport.Bounds.Size.ToVector2())))
+            if (!IntersectsWith(renderer.InverseTransformVector(Vector2.Zero), renderer.InverseTransformVector(renderer.Size)))
                 return;
 
             PrepareDraw();
 
             for (int i = 0; i < CameraScreens.Length; i++)
-                DrawScreen(false, i);
+                DrawScreen(renderer, i);
 
             Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
             Vector2 nameSize = Main.Consolas10.MeasureString(Name);
-            Vector2 namePos = PanNZoom.WorldToScreen(WorldPos + ScreenStart + new Vector2(ScreenSize.X / 2, 0)) - new Vector2(nameSize.X / 2, 0);
+            Vector2 namePos = renderer.TransformVector(WorldPos + ScreenStart + new Vector2(ScreenSize.X / 2, 0)) - new Vector2(nameSize.X / 2, 0);
             Main.SpriteBatch.DrawStringShaded(Main.Consolas10, Name, namePos, Color.Yellow);
             Main.SpriteBatch.End();
 
@@ -387,10 +387,9 @@ namespace RainMap
             Vector4 lightDirAndPixelSize = new(LightAngle.X, LightAngle.Y, 0.0007142857f, 0.00125f);
             Main.RoomColor?.Parameters["_lightDirAndPixelSize"].SetValue(lightDirAndPixelSize);
         }
-        public void DrawScreen(bool forCapture, int index)
+        public void DrawScreen(Renderer renderer, int index)
         {
             TextureAsset? texture = CameraScreens[index];
-            Vector2 pos = forCapture ? Vector2.Zero : PanNZoom.WorldToScreen(CameraPositions[index] + WorldPos);
 
             if (texture is null)
                 return;
@@ -399,6 +398,7 @@ namespace RainMap
 
             if (Main.RoomColor is not null)
             {
+                Main.RoomColor.Parameters["Projection"].SetValue(renderer.Projection);
                 Main.RoomColor.Parameters["PaletteTex"].SetValue(Palettes.GetPalette(Settings?.Palette ?? 0));
                 Main.RoomColor.Parameters["FadePaletteTex"].SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
                 Main.RoomColor.Parameters["FadePalette"].SetValue(1 - Settings?.FadePaletteValues?[index] ?? 1);
@@ -413,11 +413,11 @@ namespace RainMap
                 Main.RoomColor.Parameters["_Grime"].SetValue(Settings?.Grime ?? 0.5f);
                 Main.RoomColor.CurrentTechnique.Passes[0].Apply();
             }
-            Main.SpriteBatch.Draw(texture.Texture, pos, null, Color.White, 0f, Vector2.Zero, forCapture ? 1 : PanNZoom.Zoom, SpriteEffects.None, 0f);
+            renderer.DrawTexture(texture.Texture, CameraPositions[index] + WorldPos);
 
             Main.SpriteBatch.End();
 
-            DrawWater(forCapture, index);
+            DrawWater(renderer, index);
         }
         public void UpdateScreenSize()
         {
@@ -441,7 +441,7 @@ namespace RainMap
             for (int i = 0; i < 4; i++)
             {
                 Point dir = Directions[i];
-                Point tilePos = entrance.Add(dir);
+                Point tilePos = entrance + dir;
 
                 if (tilePos.X < 0 || tilePos.Y < 0 || tilePos.X >= Size.X || tilePos.Y >= Size.Y)
                     continue;
@@ -457,25 +457,19 @@ namespace RainMap
             return direction;
         }
 
-        void DrawWater(bool forCapture, int screenIndex)
+        void DrawWater(Renderer renderer, int screenIndex)
         {
             if (Water is null || CameraScreens[screenIndex] is null)
                 return;
 
+            //if (renderer != Main.WorldCamera)
+            //    Debugger.Break();
+
             Vector2 screenpos = CameraPositions[screenIndex];
 
-            Matrix roomMatrix;
-            if (!forCapture)
-            {
-                roomMatrix = Matrix.CreateTranslation(new Vector3(WorldPos, 0));
-                roomMatrix = Matrix.Multiply(roomMatrix, PanNZoom.WorldToScreenTransform);
-                roomMatrix = Matrix.Multiply(roomMatrix, Main.Projection);
-            }
-            else
-            {
-                roomMatrix = Matrix.CreateTranslation(new(-screenpos, 0));
-                roomMatrix = Matrix.Multiply(roomMatrix, Matrix.CreateOrthographicOffCenter(0, CaptureManager.RenderTarget.Width, CaptureManager.RenderTarget.Height, 0, 0, 1));
-            }
+            Matrix roomMatrix = Matrix.CreateTranslation(new(WorldPos, 0));
+            roomMatrix = Matrix.Multiply(roomMatrix, renderer.Transform);
+            roomMatrix = Matrix.Multiply(roomMatrix, renderer.Projection);
 
             Vector2 screensize = new(CameraScreens[screenIndex]!.Texture.Width, CameraScreens[screenIndex]!.Texture.Height);
 
@@ -492,7 +486,7 @@ namespace RainMap
             float vertSkip = 0;
             float vertSkipCounter = 0;
 
-            float pixLoss = 1 / PanNZoom.Zoom;
+            float pixLoss = 1 / renderer.Scale;
             if (pixLoss > 0)
                 vertSkip = pixLoss / WaterData.TriangleSize;
 
@@ -618,14 +612,14 @@ namespace RainMap
                 Main.WaterColor.Parameters["FadePaletteTex"].SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
                 Main.WaterColor.Parameters["FadePalette"].SetValue(1 - Settings?.FadePaletteValues?[screenIndex] ?? 1);
 
-                Vector2 spriteSize = screensize * PanNZoom.Zoom;
+                //Vector2 spriteSize = screensize * PanNZoom.Zoom;
 
                 // For some reason, on-screen sprite position is flipped in shader here if not capturing
-                if (!forCapture)
-                    spriteSize *= new Vector2(1, -1);
+                //if (!forCapture)
+                //    spriteSize *= new Vector2(1, -1);
 
                 Main.WaterColor.Parameters["_screenOff"].SetValue(CameraPositions[screenIndex] / (Main.Noise?.Bounds.Size.ToVector2() ?? Vector2.One));
-                Main.WaterColor.Parameters["_screenSize"].SetValue(forCapture ? screensize : spriteSize);
+                Main.WaterColor.Parameters["_screenSize"].SetValue(screensize);
                 Main.WaterColor.Parameters["_waterDepth"].SetValue(WaterInFrontOfTerrain ? 0 : 1f / 30);
 
                 Main.WaterColor.CurrentTechnique.Passes[0].Apply();

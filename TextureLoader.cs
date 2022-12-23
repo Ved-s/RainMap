@@ -1,10 +1,7 @@
 ﻿using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace RainMap
 {
@@ -16,31 +13,56 @@ namespace RainMap
         static Thread? LoadThread;
         static AutoResetEvent LoadTrigger = new(false);
         static bool Waiting = false;
+        static object Lock = new();
 
         public static TextureAsset Load(string path)
         {
-            if (LoadThread is null)
+            lock (Lock)
             {
-                LoadThread = new(LoadMethod);
-                LoadThread.Start();
-            }
+                if (LoadThread is null)
+                {
+                    LoadThread = new(LoadMethod);
+                    LoadThread.Start();
+                }
 
-            TextureAsset asset = new(path);
-            LoadQueue.Enqueue(asset);
-            LoadTrigger.Set();
-            return asset;
+                TextureAsset asset = new(path);
+                LoadQueue.Enqueue(asset);
+                LoadTrigger.Set();
+
+                return asset;
+            }
         }
 
         static void LoadMethod()
         {
-            Waiting = true;
-            LoadTrigger.WaitOne();
-            Waiting = false;
-
-            while (LoadQueue.TryDequeue(out TextureAsset? asset))
+            while (true)
             {
-                asset.Texture = Texture2D.FromFile(Main.Instance.GraphicsDevice, asset.Path);
-                asset.CompletionAction?.Invoke();
+                try
+                {
+                    TextureAsset? asset;
+                    while (true)
+                    {
+                        bool deq;
+                        lock (Lock)
+                        {
+                            deq = LoadQueue.TryDequeue(out asset);
+                        }
+                        if (!deq)
+                            break;
+
+                        asset!.Texture = Texture2D.FromFile(Main.Instance.GraphicsDevice, asset.Path);
+                        asset.CompletionAction?.Invoke();
+                    }
+
+                    Waiting = true;
+                    LoadTrigger.WaitOne();
+                    Waiting = false;
+                }
+                catch (ThreadInterruptedException)
+                {
+                    return;
+                }
+                catch (Exception) { }
             }
         }
 
@@ -49,9 +71,14 @@ namespace RainMap
             if (Waiting && QueueLength > 0)
                 LoadTrigger.Set();
         }
+
+        public static void Finish()
+        {
+            LoadThread?.Interrupt();
+        }
     }
 
-    public class TextureAsset 
+    public class TextureAsset
     {
         public Texture2D Texture { get => AssetValue ?? Main.Pixel; internal set => AssetValue = value; }
 
@@ -62,7 +89,7 @@ namespace RainMap
         internal Action? CompletionAction;
 
         public TextureAsset(string path)
-        { 
+        {
             Path = path;
         }
 
