@@ -33,6 +33,8 @@ void MainVS(inout ShaderData data)
 
 float4 MainPS(ShaderData i) : COLOR
 {
+    float fade = CacheFade(i.uv);
+    
     //float rand = frac(sin(dot(i.uv.x, 12.98232)+_RAIN-i.uv.y) * 43758.5453);
     float4 setColor = float4(0.0, 0.0, 0.0, 1.0);
     bool checkMaskOut = false;
@@ -51,7 +53,7 @@ float4 MainPS(ShaderData i) : COLOR
     //if(texcol.y * 255 > 7 && texcol.y * 255 < 11) return float4(0,0,1,1);
     if (texcol.x == 1.0 && texcol.y == 1.0 && texcol.z == 1.0)
     {
-        setColor = SamplePalette(0, 7);
+        setColor = SamplePalette(0, 7, fade);
         //setColor = float4(0,0,0,0);
         checkMaskOut = true;
     }
@@ -103,9 +105,9 @@ float4 MainPS(ShaderData i) : COLOR
             }
         }
 
-        setColor = lerp(SamplePalette(red * notFloorDark, paletteColor + 3), SamplePalette(red * notFloorDark, paletteColor), shadow);
+        setColor = lerp(SamplePalette(red * notFloorDark, paletteColor + 3, fade), SamplePalette(red * notFloorDark, paletteColor, fade), shadow);
         half rbcol = (sin((_RAIN + (tex2D(NoiseTex, float2(i.uv.x * 2, i.uv.y * 2)).x * 4) + red / 12.0) * 3.14 * 2) * 0.5) + 0.5;
-        setColor = lerp(setColor, SamplePalette((5.5 + rbcol * 25), 6.5), (green >= 4 ? 0.2 : 0.0) * _Grime);
+        setColor = lerp(setColor, SamplePalette((5.5 + rbcol * 25), 6.5, fade), (green >= 4 ? 0.2 : 0.0) * _Grime);
 
         if (effectCol == 100)
         {
@@ -114,7 +116,7 @@ float4 MainPS(ShaderData i) : COLOR
             if (paletteColor == 2) 
                 decalCol = lerp(decalCol, float4(1, 1, 1, 1), 0.2 - shadow * 0.1);
 
-            decalCol = lerp(decalCol, SamplePalette(1, 7), red / 60.0);
+            decalCol = lerp(decalCol, SamplePalette(1, 7, fade), red / 60.0);
             setColor = lerp(lerp(setColor, decalCol, 0.7), setColor * decalCol * 1.5, lerp(0.9, 0.3 + 0.4 * shadow, clamp((red - 3.5) * 0.3, 0, 1)));
         }
         else if (green > 0 && green < 3)
@@ -138,14 +140,14 @@ float4 MainPS(ShaderData i) : COLOR
             setColor = lerp(setColor, float4(1, 1, 1, 1), texcol.z * _SwarmRoom);
         }
 
-        float4 fogAmountPixel = SamplePalette(9, 7);
+        float4 fogAmountPixel = SamplePalette(9, 7, fade);
         float fogAmount = 1 - fogAmountPixel.r;
         if (fogAmountPixel.r == 0 && fogAmountPixel.g == 0 && fogAmountPixel.b > 0)
 	    {
 	    	fogAmount = 1 + fogAmountPixel.b;
 	    }
 
-        setColor = lerp(setColor, SamplePalette(1, 7), clamp(red * (red < 10 ? lerp(notFloorDark, 1, 0.5) : 1) * fogAmount / 30.0, 0, 1));
+        setColor = lerp(setColor, SamplePalette(1, 7, fade), clamp(red * (red < 10 ? lerp(notFloorDark, 1, 0.5) : 1) * fogAmount / 30.0, 0, 1));
 
         if (red >= 5)
         {

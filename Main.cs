@@ -43,7 +43,7 @@ namespace RainMap
 
         public static CameraRenderer WorldCamera = null!;
 
-        static Stopwatch DrawTineWatch = new();
+        static Stopwatch DrawTimeWatch = new();
         static int FPS;
         static int FPSCounter;
         static Stopwatch FPSWatcher = new();
@@ -125,8 +125,8 @@ namespace RainMap
 
             float shaderTime = (float)gameTime.TotalGameTime.TotalSeconds / 5;
 
-            RoomColor?.Parameters["_RAIN"].SetValue(shaderTime);
-            WaterColor?.Parameters["_RAIN"].SetValue(shaderTime);
+            RoomColor?.Parameters["_RAIN"]?.SetValue(shaderTime);
+            WaterColor?.Parameters["_RAIN"]?.SetValue(shaderTime);
             PixelEffect.Projection = Projection;
 
             Region?.Update();
@@ -198,10 +198,16 @@ namespace RainMap
             if (Region is not null)
             {
                 Window.Title = $"RainMap " +
-                    $"DT: {DrawTineWatch.Elapsed.TotalMilliseconds.ToString("0.00", CultureInfo.InvariantCulture)}ms " +
+                    $"DT: {DrawTimeWatch.Elapsed.TotalMilliseconds.ToString("0.00", CultureInfo.InvariantCulture)}ms " +
                     $"FPS: {FPS}" +
                     $"{(TextureLoader.QueueLength == 0 ? "" : $" Loading {TextureLoader.QueueLength} textures")}";
             }
+        }
+
+        protected override bool BeginDraw()
+        {
+            DrawTimeWatch.Restart();
+            return true;
         }
 
         protected override void Draw(GameTime gameTime)
@@ -257,7 +263,6 @@ namespace RainMap
                 }
             }
 
-            DrawTineWatch.Restart();
             GraphicsDevice.Clear(Region?.BackgroundColor ?? Color.CornflowerBlue);
 
             SpriteBatch.Begin();
@@ -301,7 +306,12 @@ namespace RainMap
             }
 
             base.Draw(gameTime);
-            DrawTineWatch.Stop();
+        }
+
+        protected override void EndDraw()
+        {
+            base.EndDraw();
+            DrawTimeWatch.Stop();
             FPSCounter++;
             if (FPSWatcher.Elapsed.TotalSeconds > 1)
             {
@@ -338,9 +348,9 @@ namespace RainMap
                 EffectColors = Texture2D.FromFile(GraphicsDevice, Path.Combine(rwpath, "Assets\\Futile\\Resources\\Palettes\\effectColors.png"));
                 Palettes.SetPalettePath(Path.Combine(rwpath, "Assets\\Futile\\Resources\\Palettes"));
 
-                RoomColor.Parameters["NoiseTex"].SetValue(Noise);
-                WaterColor.Parameters["NoiseTex"].SetValue(Noise);
-                RoomColor.Parameters["EffectColors"].SetValue(EffectColors);
+                RoomColor.Parameters["NoiseTex"]?.SetValue(Noise);
+                WaterColor.Parameters["NoiseTex"]?.SetValue(Noise);
+                RoomColor.Parameters["EffectColors"]?.SetValue(EffectColors);
 
                 ThreadPool.QueueUserWorkItem((_) =>
                 {

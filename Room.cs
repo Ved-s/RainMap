@@ -1,7 +1,9 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -24,7 +26,6 @@ namespace RainMap
         public bool WaterInFrontOfTerrain;
         public Vector2 LightAngle;
         public Vector2[] CameraPositions = null!;
-
         public TextureAsset?[] CameraScreens = null!;
 
         public Tile[,] Tiles = null!;
@@ -41,6 +42,10 @@ namespace RainMap
         public RoomSettings? Settings;
         public WaterData? Water;
         public bool Rendered;
+
+        Texture2D? FadePosValCache = null;
+        Vector2[] FixedCameraPositions = null!;
+        bool DoneFullScreenUpdate = false;
 
         public string FilePath = null!;
 
@@ -114,6 +119,7 @@ namespace RainMap
                 }
 
                 room.CameraPositions = positions.ToArray();
+                room.FixCameraPositions();
             }
 
             if (lines.TryGet(11, out string tiles))
@@ -288,6 +294,134 @@ namespace RainMap
         }
         public void Update()
         {
+            if (!DoneFullScreenUpdate && CameraScreens.All(s => s is null || s.Loaded))
+            {
+                UpdateScreenSize();
+                DoneFullScreenUpdate = true;
+            }
+
+            UpdateWater();
+        }
+
+        public void Draw(Renderer renderer)
+        {
+            Rendered = false;
+
+            if (!IntersectsWith(renderer.InverseTransformVector(Vector2.Zero), renderer.InverseTransformVector(renderer.Size)))
+                return;
+
+            PrepareDraw();
+
+            for (int i = 0; i < CameraScreens.Length; i++)
+                DrawScreen(renderer, i);
+
+            Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            Vector2 nameSize = Main.Consolas10.MeasureString(Name);
+            Vector2 namePos = renderer.TransformVector(WorldPos + ScreenStart + new Vector2(ScreenSize.X / 2, 0)) - new Vector2(nameSize.X / 2, 0);
+            Main.SpriteBatch.DrawStringShaded(Main.Consolas10, Name, namePos, Color.Yellow);
+            Main.SpriteBatch.End();
+
+            Rendered = true;
+        }
+        public void PrepareDraw()
+        {
+            Vector4 lightDirAndPixelSize = new(LightAngle.X, LightAngle.Y, 0.0007142857f, 0.00125f);
+            Main.RoomColor?.Parameters["_lightDirAndPixelSize"]?.SetValue(lightDirAndPixelSize);
+        }
+        public void DrawScreen(Renderer renderer, int index)
+        {
+            TextureAsset? texture = CameraScreens[index];
+
+            if (texture is null)
+                return;
+
+            Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
+
+            if (Main.RoomColor is not null)
+            {
+                Main.RoomColor.Parameters["Projection"]?.SetValue(renderer.Projection);
+                ApplyPaletteToShader(Main.RoomColor, index);
+
+                if (Settings?.EffectColorA is not null)
+                    Main.RoomColor.Parameters["EffectColorA"]?.SetValue(Settings.EffectColorA.Value);
+
+                if (Settings?.EffectColorB is not null)
+                    Main.RoomColor.Parameters["EffectColorB"]?.SetValue(Settings.EffectColorB.Value);
+
+                Main.RoomColor.Parameters["_light"]?.SetValue(MathHelper.Lerp(1, -1, Settings?.Clouds ?? 0));
+                Main.RoomColor.Parameters["_Grime"]?.SetValue(Settings?.Grime ?? 0.5f);
+                Main.RoomColor.CurrentTechnique.Passes[0].Apply();
+            }
+            renderer.DrawTexture(texture.Texture, CameraPositions[index] + WorldPos);
+
+            Main.SpriteBatch.End();
+
+            DrawWater(renderer, index);
+
+            //Main.SpriteBatch.Begin();
+            //Main.SpriteBatch.DrawStringShaded(Main.Consolas10, $"F: {Settings?.FadePaletteValues?[index]}", renderer.TransformVector(WorldPos + CameraPositions[index]), Color.Yellow);
+            //Main.SpriteBatch.End();
+        }
+        public void UpdateScreenSize()
+        {
+            Vector2 max = new(0, 0);
+            for (int i = 0; i < CameraScreens.Length; i++)
+            {
+                max.X = Math.Max(max.X, CameraPositions[i].X + (CameraScreens[i]?.Texture.Width ?? 0));
+                max.Y = Math.Max(max.Y, CameraPositions[i].Y + (CameraScreens[i]?.Texture.Height ?? 0));
+            }
+
+            ScreenSize = max - ScreenStart;
+            Water?.UpdateRoomSizes(ScreenSize.X, CameraScreens.Max(s => s?.Texture.Width ?? 0));
+
+            if (FadePosValCache is null || FadePosValCache.Width != CameraPositions.Length)
+                FadePosValCache = new(Main.Instance.GraphicsDevice, CameraPositions.Length, 1);
+
+            Color[] fadePosValColors = ArrayPool<Color>.Shared.Rent(CameraPositions.Length);
+            for (int i = 0; i < CameraScreens.Length; i++)
+            {
+                float texWidth = CameraScreens[i]?.Texture.Width ?? 0;
+                float texHeight = CameraScreens[i]?.Texture.Height ?? 0;
+                //max.X = Math.Max(max.X, CameraPositions[i].X + texWidth);
+                //max.Y = Math.Max(max.Y, CameraPositions[i].Y + texHeight);
+                fadePosValColors[i] = new
+                (
+                    (FixedCameraPositions[i].X + texWidth / 2 - ScreenStart.X) / ScreenSize.X,
+                    (FixedCameraPositions[i].Y + texHeight / 2 - ScreenStart.Y) / ScreenSize.Y,
+                    Settings?.FadePaletteValues?[i] ?? 0
+                );
+            }
+            FadePosValCache.SetData(fadePosValColors, 0, CameraPositions.Length);
+            ArrayPool<Color>.Shared.Return(fadePosValColors);
+        }
+
+        public Vector2 GetExitDirection(int index)
+        {
+            Point entrance = RoomExitEntrances[index];
+
+            Vector2 direction = Vector2.Zero;
+
+            for (int i = 0; i < 4; i++)
+            {
+                Point dir = Directions[i];
+                Point tilePos = entrance + dir;
+
+                if (tilePos.X < 0 || tilePos.Y < 0 || tilePos.X >= Size.X || tilePos.Y >= Size.Y)
+                    continue;
+
+                Tile tile = Tiles[tilePos.X, tilePos.Y];
+                if (tile.Terrain != Tile.TerrainType.Solid)
+                    direction -= dir.ToVector2();
+            }
+
+            //if (direction == Vector2.Zero)
+            //    Debugger.Break();
+
+            return direction;
+        }
+
+        private void UpdateWater()
+        {
             if (Water is null || Main.KeyboardState.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.P))
                 return;
 
@@ -362,101 +496,6 @@ namespace RainMap
                 Water.Surface[num14, 0].height = MathHelper.Clamp(num15, -40f, 40f);
             }
         }
-        public void Draw(Renderer renderer)
-        {
-            Rendered = false;
-
-            if (!IntersectsWith(renderer.InverseTransformVector(Vector2.Zero), renderer.InverseTransformVector(renderer.Size)))
-                return;
-
-            PrepareDraw();
-
-            for (int i = 0; i < CameraScreens.Length; i++)
-                DrawScreen(renderer, i);
-
-            Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
-            Vector2 nameSize = Main.Consolas10.MeasureString(Name);
-            Vector2 namePos = renderer.TransformVector(WorldPos + ScreenStart + new Vector2(ScreenSize.X / 2, 0)) - new Vector2(nameSize.X / 2, 0);
-            Main.SpriteBatch.DrawStringShaded(Main.Consolas10, Name, namePos, Color.Yellow);
-            Main.SpriteBatch.End();
-
-            Rendered = true;
-        }
-        public void PrepareDraw()
-        {
-            Vector4 lightDirAndPixelSize = new(LightAngle.X, LightAngle.Y, 0.0007142857f, 0.00125f);
-            Main.RoomColor?.Parameters["_lightDirAndPixelSize"].SetValue(lightDirAndPixelSize);
-        }
-        public void DrawScreen(Renderer renderer, int index)
-        {
-            TextureAsset? texture = CameraScreens[index];
-
-            if (texture is null)
-                return;
-
-            Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
-
-            if (Main.RoomColor is not null)
-            {
-                Main.RoomColor.Parameters["Projection"].SetValue(renderer.Projection);
-                Main.RoomColor.Parameters["PaletteTex"].SetValue(Palettes.GetPalette(Settings?.Palette ?? 0));
-                Main.RoomColor.Parameters["FadePaletteTex"].SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
-                Main.RoomColor.Parameters["FadePalette"].SetValue(1 - Settings?.FadePaletteValues?[index] ?? 1);
-
-                if (Settings?.EffectColorA is not null)
-                    Main.RoomColor.Parameters["EffectColorA"].SetValue(Settings.EffectColorA.Value);
-
-                if (Settings?.EffectColorB is not null)
-                    Main.RoomColor.Parameters["EffectColorB"].SetValue(Settings.EffectColorB.Value);
-
-                Main.RoomColor.Parameters["_light"].SetValue(MathHelper.Lerp(1, -1, Settings?.Clouds ?? 0));
-                Main.RoomColor.Parameters["_Grime"].SetValue(Settings?.Grime ?? 0.5f);
-                Main.RoomColor.CurrentTechnique.Passes[0].Apply();
-            }
-            renderer.DrawTexture(texture.Texture, CameraPositions[index] + WorldPos);
-
-            Main.SpriteBatch.End();
-
-            DrawWater(renderer, index);
-        }
-        public void UpdateScreenSize()
-        {
-            Vector2 max = new(0, 0);
-            for (int i = 0; i < CameraScreens.Length; i++)
-            {
-                max.X = Math.Max(max.X, CameraPositions[i].X + (CameraScreens[i]?.Texture.Width ?? 0));
-                max.Y = Math.Max(max.Y, CameraPositions[i].Y + (CameraScreens[i]?.Texture.Height ?? 0));
-            }
-
-            ScreenSize = max - ScreenStart;
-            Water?.UpdateRoomSizes(ScreenSize.X, CameraScreens.Max(s => s?.Texture.Width ?? 0));
-        }
-
-        public Vector2 GetExitDirection(int index)
-        {
-            Point entrance = RoomExitEntrances[index];
-
-            Vector2 direction = Vector2.Zero;
-
-            for (int i = 0; i < 4; i++)
-            {
-                Point dir = Directions[i];
-                Point tilePos = entrance + dir;
-
-                if (tilePos.X < 0 || tilePos.Y < 0 || tilePos.X >= Size.X || tilePos.Y >= Size.Y)
-                    continue;
-
-                Tile tile = Tiles[tilePos.X, tilePos.Y];
-                if (tile.Terrain != Tile.TerrainType.Solid)
-                    direction -= dir.ToVector2();
-            }
-
-            //if (direction == Vector2.Zero)
-            //    Debugger.Break();
-
-            return direction;
-        }
-
         void DrawWater(Renderer renderer, int screenIndex)
         {
             if (Water is null || CameraScreens[screenIndex] is null)
@@ -549,11 +588,9 @@ namespace RainMap
 
             if (vertexIndex > 3)
             {
+                ApplyPaletteToShader(Main.WaterSurface, screenIndex);
                 Main.WaterSurface.Parameters["LevelTex"].SetValue(CameraScreens[screenIndex]!.Texture);
                 Main.WaterSurface.Parameters["Projection"].SetValue(roomMatrix);
-                Main.WaterSurface.Parameters["PaletteTex"].SetValue(Palettes.GetPalette(Settings?.Palette ?? 0));
-                Main.WaterSurface.Parameters["FadePaletteTex"].SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
-                Main.WaterSurface.Parameters["FadePalette"].SetValue(1 - Settings?.FadePaletteValues?[screenIndex] ?? 1);
                 Main.WaterSurface.Parameters["_waterDepth"].SetValue(WaterInFrontOfTerrain ? 0 : 1f / 30);
 
                 Main.Instance.GraphicsDevice.SamplerStates[0] = SamplerState.PointClamp;
@@ -605,12 +642,10 @@ namespace RainMap
 
             if (vertexIndex > 3)
             {
+                ApplyPaletteToShader(Main.WaterColor, screenIndex);
 
                 Main.WaterColor.Parameters["LevelTex"].SetValue(CameraScreens[screenIndex]!.Texture);
                 Main.WaterColor.Parameters["Projection"].SetValue(roomMatrix);
-                Main.WaterColor.Parameters["PaletteTex"].SetValue(Palettes.GetPalette(Settings?.Palette ?? 0));
-                Main.WaterColor.Parameters["FadePaletteTex"].SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
-                Main.WaterColor.Parameters["FadePalette"].SetValue(1 - Settings?.FadePaletteValues?[screenIndex] ?? 1);
 
                 //Vector2 spriteSize = screensize * PanNZoom.Zoom;
 
@@ -627,6 +662,43 @@ namespace RainMap
                 Main.Instance.GraphicsDevice.SamplerStates[0] = SamplerState.PointClamp;
                 Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, Water.Vertices, 0, vertexIndex - 2);
             }
+        }
+
+        public void ApplyPaletteToShader(Effect effect, int screenIndex)
+        {
+            effect.Parameters["PaletteTex"]?.SetValue(Palettes.GetPalette(Settings?.Palette ?? 0));
+            effect.Parameters["FadePaletteTex"]?.SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
+            if (FadePosValCache is not null)
+                effect.Parameters["FadePosValTex"]?.SetValue(FadePosValCache);
+            effect.Parameters["FadeSize"]?.SetValue(CameraPositions.Length);
+            effect.Parameters["FadeRect"]?.SetValue(new Vector4()
+            {
+                X = (CameraPositions[screenIndex].X - ScreenStart.X) / ScreenSize.X,
+                Y = (CameraPositions[screenIndex].X + (CameraScreens[screenIndex]?.Texture.Width ?? 0) - ScreenStart.X) / ScreenSize.X,
+                Z = (CameraPositions[screenIndex].Y - ScreenStart.Y) / ScreenSize.Y,
+                W = (CameraPositions[screenIndex].Y + (CameraScreens[screenIndex]?.Texture.Height ?? 0) - ScreenStart.Y) / ScreenSize.Y,
+            });
+
+        }
+
+        void FixCameraPositions()
+        {
+            if (FixedCameraPositions is null || FixedCameraPositions.Length != CameraPositions.Length)
+            {
+                FixedCameraPositions = new Vector2[CameraPositions.Length];
+            }
+
+            float quantizationSize = 20;
+
+            for (int i = 0; i < CameraPositions.Length; i++)
+            {
+                Vector2 vec = CameraPositions[i];
+
+                vec.X = MathF.Floor(vec.X / quantizationSize) * quantizationSize + quantizationSize / 2;
+                vec.Y = MathF.Floor(vec.Y / quantizationSize) * quantizationSize + quantizationSize / 2;
+                FixedCameraPositions[i] = vec;
+            }
+
         }
 
         // I have no idea what that does

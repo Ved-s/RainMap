@@ -33,6 +33,8 @@ float4 MainPS(ShaderData data, float2 scrPos : VPOS) : COLOR
 	if (data.uv.x < 0 || data.uv.y < 0 || data.uv.x > 1 || data.uv.y > 1)
 		clip(-1);
 
+    float fade = CacheFade(data.uv);
+	
 	float rbcol = (sin((_RAIN + (tex2D(NoiseTex, _screenOff + float2(data.uv.x*1.2, data.uv.y*1.2) ).x * 3) + 0/12.0) * 3.14 * 2)*0.5)+0.5;
 	
 	float2 distortion = float2(lerp(-0.002, 0.002, rbcol)*lerp(1, 20, pow(data.depth, 200)), -0.02 * pow(data.depth, 8));
@@ -69,7 +71,7 @@ float4 MainPS(ShaderData data, float2 scrPos : VPOS) : COLOR
             else
             {
                 grad = 6.0 / 30.0;
-                grabColor *= lerp(SamplePalette(5, 7), float4(1, 1, 1, 1), 0.75);
+                grabColor *= lerp(SamplePalette(5, 7, fade), float4(1, 1, 1, 1), 0.75);
                 plrLightDst = 1;
             }
         }
@@ -98,7 +100,7 @@ float4 MainPS(ShaderData data, float2 scrPos : VPOS) : COLOR
 	 
 	grad = lerp(grad, pow(grad, lerp(0.2, 1, plrLightDst)), clr.z);
    
-	texcol = lerp(SamplePalette(5, 7), SamplePalette(4, 7), grad);
+    texcol = lerp(SamplePalette(5, 7, fade), SamplePalette(4, 7, fade), grad);
 	
 	if(grabColor.x > 1.0/255.0 || grabColor.y != 0.0 || grabColor.z != 0.0) 
         return lerp(texcol, grabColor, pow(clamp((data.depth - 0.9) * 10, 0, 1), 3));

@@ -37,8 +37,9 @@ float4 MainPS(ShaderData data) : COLOR
     //    if (grabColor.x > 1.0 / 255.0 || grabColor.y != 0.0 || grabColor.z != 0.0) 
     //        return float4(0, 0, 0, 0);
     //}
-
-    float4 watercolor = lerp(SamplePalette(4, 7), SamplePalette(7, 7), data.depth);
+    float fade = CacheFade(data.uv);
+    
+    float4 watercolor = lerp(SamplePalette(4, 7, fade), SamplePalette(7, 7, fade), data.depth);
 
     return watercolor;
 }
