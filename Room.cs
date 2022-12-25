@@ -3,12 +3,10 @@ using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
 namespace RainMap
 {
@@ -20,9 +18,9 @@ namespace RainMap
         public Point Size;
 
         public Vector2 WorldPos;
-        
 
-        public float WaterLevel;
+        public float WaterHeight;
+        public int WaterLevel = -1;
         public bool WaterInFrontOfTerrain;
         public Vector2 LightAngle;
         public Vector2[] CameraPositions = null!;
@@ -72,7 +70,8 @@ namespace RainMap
                 }
                 if (swArray.TryGet(1, out string waterLevelStr) && int.TryParse(waterLevelStr, out int waterLevel))
                 {
-                    room.WaterLevel = waterLevel * 20 + 10;
+                    room.WaterLevel = waterLevel;
+                    room.WaterHeight = waterLevel * 20;
                 }
                 if (swArray.TryGet(2, out string waterInFrontStr))
                 {
@@ -150,13 +149,21 @@ namespace RainMap
 
                         switch (tileArray[j])
                         {
+                            case "1": tile.Attributes |= Tile.TileAttributes.VerticalBeam; break;
+                            case "2": tile.Attributes |= Tile.TileAttributes.HorizontalBeam; break;
+
                             case "3" when tile.Shortcut == Tile.ShortcutType.None:
                                 tile.Shortcut = Tile.ShortcutType.Normal;
                                 break;
 
                             case "4": tile.Shortcut = Tile.ShortcutType.RoomExit; break;
                             case "5": tile.Shortcut = Tile.ShortcutType.CreatureHole; break;
+                            case "6": tile.Attributes |= Tile.TileAttributes.WallBehind; break;
+                            case "7": tile.Attributes |= Tile.TileAttributes.Hive; break;
+                            case "8": tile.Attributes |= Tile.TileAttributes.Waterfall; break;
                             case "9": tile.Shortcut = Tile.ShortcutType.NPCTransportation; break;
+                            case "10": tile.Attributes |= Tile.TileAttributes.GarbageHole; break;
+                            case "11": tile.Attributes |= Tile.TileAttributes.WormGrass; break;
                             case "12": tile.Shortcut = Tile.ShortcutType.RegionTransportation; break;
                         }
                     }
@@ -279,7 +286,7 @@ namespace RainMap
 
             room.UpdateScreenSize();
 
-            if (room.WaterLevel > 0)
+            if (room.WaterHeight > 0)
                 room.Water = new WaterData(room.ScreenSize.X, room.CameraScreens.Max(s => s?.Texture.Width ?? 0));
 
             return room;
@@ -335,29 +342,33 @@ namespace RainMap
             if (texture is null)
                 return;
 
-            Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
-
-            if (Main.RoomColor is not null)
+            if (Main.RenderRoomLevel)
             {
-                Main.RoomColor.Parameters["Projection"]?.SetValue(renderer.Projection);
-                ApplyPaletteToShader(Main.RoomColor, index);
 
-                if (Settings?.EffectColorA is not null)
-                    Main.RoomColor.Parameters["EffectColorA"]?.SetValue(Settings.EffectColorA.Value);
+                Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
 
-                if (Settings?.EffectColorB is not null)
-                    Main.RoomColor.Parameters["EffectColorB"]?.SetValue(Settings.EffectColorB.Value);
+                if (Main.RoomColor is not null)
+                {
+                    Main.RoomColor.Parameters["Projection"]?.SetValue(renderer.Projection);
+                    ApplyPaletteToShader(Main.RoomColor, index);
 
-                Main.RoomColor.Parameters["_light"]?.SetValue(MathHelper.Lerp(1, -1, Settings?.Clouds ?? 0));
-                Main.RoomColor.Parameters["_Grime"]?.SetValue(Settings?.Grime ?? 0.5f);
-                Main.RoomColor.CurrentTechnique.Passes[0].Apply();
+                    if (Settings?.EffectColorA is not null)
+                        Main.RoomColor.Parameters["EffectColorA"]?.SetValue(Settings.EffectColorA.Value);
+
+                    if (Settings?.EffectColorB is not null)
+                        Main.RoomColor.Parameters["EffectColorB"]?.SetValue(Settings.EffectColorB.Value);
+
+                    Main.RoomColor.Parameters["_light"]?.SetValue(MathHelper.Lerp(1, -1, Settings?.Clouds ?? 0));
+                    Main.RoomColor.Parameters["_Grime"]?.SetValue(Settings?.Grime ?? 0.5f);
+                    Main.RoomColor.CurrentTechnique.Passes[0].Apply();
+                }
+                renderer.DrawTexture(texture.Texture, CameraPositions[index] + WorldPos);
+
+                Main.SpriteBatch.End();
+
+                DrawWater(renderer, index);
             }
-            renderer.DrawTexture(texture.Texture, CameraPositions[index] + WorldPos);
-
-            Main.SpriteBatch.End();
-
-            DrawWater(renderer, index);
-
+            DrawTileOverlay(renderer, index);
             //Main.SpriteBatch.Begin();
             //Main.SpriteBatch.DrawStringShaded(Main.Consolas10, $"F: {Settings?.FadePaletteValues?[index]}", renderer.TransformVector(WorldPos + CameraPositions[index]), Color.Yellow);
             //Main.SpriteBatch.End();
@@ -418,6 +429,12 @@ namespace RainMap
             //    Debugger.Break();
 
             return direction;
+        }
+        public Tile GetTile(int x, int y)
+        {
+            x = Math.Clamp(x, 0, Size.X - 1);
+            y = Math.Clamp(y, 0, Size.Y - 1);
+            return Tiles[x, y];
         }
 
         private void UpdateWater()
@@ -557,11 +574,11 @@ namespace RainMap
                 float farPos = Water.Surface[j, 1].pos;
 
                 Vector2 close = new();
-                close.Y = Size.Y * 20 - (WaterLevel + closePos);
+                close.Y = Size.Y * 20 - (WaterHeight + closePos);
                 close.X = j * WaterData.TriangleSize + ScreenStart.X;
 
                 Vector2 far = new();
-                far.Y = Size.Y * 20 - (WaterLevel + farPos);
+                far.Y = Size.Y * 20 - (WaterHeight + farPos);
                 far.X = j * WaterData.TriangleSize + ScreenStart.X;
 
                 far = ApplyDepthOnVector(far, ScreenSize * new Vector2(.5f, 0.5f), 30);
@@ -620,7 +637,7 @@ namespace RainMap
                 WaterData.SurfacePoint point = Water.Surface[j, 0];
 
                 Vector2 vertPos = new();
-                vertPos.Y = Size.Y * 20 - (WaterLevel + point.pos);
+                vertPos.Y = Size.Y * 20 - (WaterHeight + point.pos);
                 vertPos.X = j * WaterData.TriangleSize + ScreenStart.X;
 
                 Vector2 texPos = (vertPos - screenpos) / screensize;
@@ -662,6 +679,149 @@ namespace RainMap
                 Main.Instance.GraphicsDevice.SamplerStates[0] = SamplerState.PointClamp;
                 Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, Water.Vertices, 0, vertexIndex - 2);
             }
+        }
+
+        void DrawTileOverlay(Renderer renderer, int screenIndex)
+        {
+            if (!Main.RenderRoomTiles)
+                return;
+
+            float bgAlpha = Main.RenderRoomLevel ? .2f : 1;
+            float solidAlpha = Main.RenderRoomLevel ? .8f : 1;
+            float waterAlpha = .1f;
+            float water2Alpha = .2f;
+            float wallAlpha = .4f;
+
+            Main.SpriteBatch.Begin();
+            renderer.DrawTexture(Main.Pixel, WorldPos + CameraPositions[screenIndex], null, CameraScreens[screenIndex]?.Texture.Size() ?? Vector2.Zero, Color.Gray * bgAlpha);
+            Main.SpriteBatch.End();
+
+            Matrix matrix = Matrix.Multiply(Matrix.CreateScale(20), Matrix.CreateTranslation(new(WorldPos, 0)));
+            matrix = Matrix.Multiply(matrix, renderer.Transform);
+            matrix = Matrix.Multiply(matrix, renderer.Projection);
+
+            TriangleDrawing.Clear();
+            TriangleDrawing.UseClamp = true;
+
+            TriangleDrawing.ClampTL = CameraPositions[screenIndex] / 20;
+            TriangleDrawing.ClampBR = (CameraPositions[screenIndex] + (CameraScreens[screenIndex]?.Texture.Size() ?? Vector2.Zero)) / 20;
+
+            //TriangleDrawing.AddQuad(new(10, 10), new(100, 10), new(10, 100), new(100, 100), Color.Lime * 0.5f);
+
+            int xstart = (int)(CameraPositions[screenIndex].X / 20) - 1;
+            int ystart = (int)(CameraPositions[screenIndex].Y / 20) - 1;
+            int xend = (int)((CameraPositions[screenIndex].X + CameraScreens[screenIndex]?.Texture.Width ?? 0) / 20) + 1;
+            int yend = (int)((CameraPositions[screenIndex].Y + CameraScreens[screenIndex]?.Texture.Height ?? 0) / 20) + 1;
+
+            for (int y = ystart; y < yend; y++)
+            {
+                bool water = WaterLevel > 0 && !WaterInFrontOfTerrain && y >= Size.Y - WaterLevel;
+
+                for (int x = xstart; x < xend; x++)
+                {
+                    Tile tile = GetTile(x, y);
+
+                    switch (tile.Terrain)
+                    {
+                        case Tile.TerrainType.Solid:
+                            if (x > xstart && GetTile(x - 1, y).Terrain == Tile.TerrainType.Solid)
+                                break;
+                            int width = 1;
+                            while (x + width < xend && GetTile(x + width, y).Terrain == Tile.TerrainType.Solid)
+                                width++;
+
+                            TriangleDrawing.AddQuad(new(x, y), new(x + width, y), new(x, y + 1), new(x + width, y + 1), Color.Black * solidAlpha);
+                            break;
+
+                        case Tile.TerrainType.Floor:
+                            TriangleDrawing.AddQuad(new(x, y), new(x + 1, y), new(x, y + .5f), new(x + 1, y + .5f), Color.Black * solidAlpha);
+                            break;
+
+                        case Tile.TerrainType.ShortcutEntrance:
+                            TriangleDrawing.AddQuad(new(x + .2f, y + .5f), new(x + .5f, y + .2f), new(x + .5f, y + .8f), new(x + .8f, y + .5f), Color.White * solidAlpha);
+                            break;
+                    }
+
+                    if (tile.Terrain != Tile.TerrainType.ShortcutEntrance && x >= 0 && y >= 0 && x < Size.X && y < Size.Y && renderer.Scale > 0.1f)
+                        switch (tile.Shortcut)
+                        {
+                            case Tile.ShortcutType.Normal:
+                                TriangleDrawing.AddQuad(new(x + .4f, y + .4f), new(x + .6f, y + .4f), new(x + .4f, y + .6f), new(x + .6f, y + .6f), Color.White * 0.8f);
+                                break;
+
+                            case Tile.ShortcutType.RoomExit:
+                                TriangleDrawing.AddQuad(new(x + .2f, y + .5f), new(x + .5f, y + .2f), new(x + .5f, y + .8f), new(x + .8f, y + .5f), Color.Yellow * 0.8f);
+                                break;
+                            case Tile.ShortcutType.CreatureHole:
+                                TriangleDrawing.AddQuad(new(x + .2f, y + .5f), new(x + .5f, y + .2f), new(x + .5f, y + .8f), new(x + .8f, y + .5f), Color.Magenta * 0.8f);
+                                break;
+                            case Tile.ShortcutType.NPCTransportation:
+                                TriangleDrawing.AddQuad(new(x + .2f, y + .5f), new(x + .5f, y + .2f), new(x + .5f, y + .8f), new(x + .8f, y + .5f), Color.Lime * 0.8f);
+                                break;
+                            case Tile.ShortcutType.RegionTransportation:
+                                TriangleDrawing.AddQuad(new(x + .2f, y + .5f), new(x + .5f, y + .2f), new(x + .5f, y + .8f), new(x + .8f, y + .5f), Color.Red * 0.8f);
+                                break;
+                        }
+
+                    for (int i = 0; i <= 6; i++)
+                    {
+                        Tile.TileAttributes feature = (Tile.TileAttributes)(1 << i);
+                        if ((tile.Attributes & feature) == 0)
+                            continue;
+
+                        switch (feature)
+                        {
+                            case Tile.TileAttributes.VerticalBeam:
+                                TriangleDrawing.AddQuad(new(x + .4f, y), new(x + .6f, y), new(x + .4f, y + 1), new(x + .6f, y + 1), Color.Black * solidAlpha);
+                                break;
+
+                            case Tile.TileAttributes.HorizontalBeam:
+                                TriangleDrawing.AddQuad(new(x, y + .4f), new(x + 1, y + .4f), new(x, y + .6f), new(x + 1, y + .6f), Color.Black * solidAlpha);
+                                break;
+
+                            case Tile.TileAttributes.WallBehind:
+                                TriangleDrawing.AddQuad(new(x, y), new(x + 1, y), new(x, y + 1), new(x + 1, y + 1), Color.Black * wallAlpha);
+                                break;
+
+                            case Tile.TileAttributes.Hive:
+                                TriangleDrawing.AddTriangle(
+                                    new(x + .05f, y + 1), Color.Black * solidAlpha,
+                                    new(x + .275f, y + .3f), Color.White,
+                                    new(x + .5f, y + 1), Color.Black * solidAlpha);
+                                TriangleDrawing.AddTriangle(
+                                    new(x + .5f, y + 1), Color.Black * solidAlpha,
+                                    new(x + .725f, y + .6f), Color.Gray,
+                                    new(x + 1f, y + 1), Color.Black * solidAlpha);
+                                break;
+                            case Tile.TileAttributes.Waterfall:
+                                break;
+                            case Tile.TileAttributes.GarbageHole:
+                                break;
+                            case Tile.TileAttributes.WormGrass:
+                                break;
+                        }
+                    }
+
+                    if (water && tile.Terrain != Tile.TerrainType.Solid && (x == xend - 1 || GetTile(x + 1, y).Terrain == Tile.TerrainType.Solid))
+                    {
+                        int width = 1;
+                        while (x - width >= xstart && GetTile(x - width, y).Terrain != Tile.TerrainType.Solid)
+                            width++;
+
+                        TriangleDrawing.AddQuad(new(x - width + 1, y), new(x + 1, y), new(x - width + 1, y + 1), new(x + 1, y + 1), Color.Blue * water2Alpha);
+                    }
+                }
+            }
+
+            if (WaterInFrontOfTerrain)
+            {
+                int y = Size.Y - WaterLevel;
+                TriangleDrawing.AddQuad(new(xstart, y), new(xend, y), new(xstart, yend), new(xend, yend), Color.Blue * waterAlpha);
+            }
+
+            Main.PixelEffect.Projection = matrix;
+            Main.PixelEffect.VertexColorEnabled = true;
+            TriangleDrawing.Draw(Main.PixelEffect);
         }
 
         public void ApplyPaletteToShader(Effect effect, int screenIndex)
@@ -721,6 +881,20 @@ namespace RainMap
         {
             public TerrainType Terrain;
             public ShortcutType Shortcut;
+            public TileAttributes Attributes;
+
+            [Flags]
+            public enum TileAttributes
+            {
+                None = 0,
+                VerticalBeam = 1,
+                HorizontalBeam = 2,
+                WallBehind = 4,
+                Hive = 8,
+                Waterfall = 16,
+                GarbageHole = 32,
+                WormGrass = 64
+            }
 
             public enum TerrainType
             {
@@ -750,7 +924,7 @@ namespace RainMap
             public float Depth;
 
             public VertexDeclaration VertexDeclaration => Declaration;
-            static VertexDeclaration Declaration = new(new VertexElement[] 
+            static VertexDeclaration Declaration = new(new VertexElement[]
             {
                 new(0, VertexElementFormat.Vector2, VertexElementUsage.Position, 0),
                 new(8, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 0),

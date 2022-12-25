@@ -43,6 +43,9 @@ namespace RainMap
 
         public static CameraRenderer WorldCamera = null!;
 
+        public static bool RenderRoomLevel = true;
+        public static bool RenderRoomTiles = false;
+
         static Stopwatch DrawTimeWatch = new();
         static int FPS;
         static int FPSCounter;
@@ -187,12 +190,26 @@ namespace RainMap
             }
 
             if (IsActive)
+            {
                 WorldCamera.Update();
 
-            if (KeyboardState.IsKeyDown(Keys.F7) && OldKeyboardState.IsKeyUp(Keys.F7))
-            {
-                foreach (Room room in SelectedRooms)
-                    room.UpdateScreenSize();
+                if (KeyboardState.IsKeyDown(Keys.F5) && OldKeyboardState.IsKeyUp(Keys.F5))
+                {
+                    RenderRoomLevel = !RenderRoomLevel;
+                    if (!RenderRoomLevel)
+                        RenderRoomTiles = true;
+                }
+
+                if (KeyboardState.IsKeyDown(Keys.F6) && OldKeyboardState.IsKeyUp(Keys.F6))
+                {
+                    RenderRoomTiles = !RenderRoomTiles;
+                    if (!RenderRoomTiles)
+                        RenderRoomLevel = true;
+                }
+
+                if (KeyboardState.IsKeyDown(Keys.F7) && OldKeyboardState.IsKeyUp(Keys.F7))
+                    foreach (Room room in SelectedRooms)
+                        room.UpdateScreenSize();
             }
 
             if (Region is not null)
