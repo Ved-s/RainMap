@@ -15,5 +15,7 @@ When all rooms are loaded, you can:
 - Press F5 to switch room layer visibility
 - Press F6 to switch room tile layer visibility
 - Press F8 to start region rendering
+
     RainMap will ask for result file path then start rendering all rooms into single image file
+    
     All visible layers at the moment os starting the render will be visible in the final render
