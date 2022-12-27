@@ -27,7 +27,7 @@ jobs:
     - name: Build
       run: |
         cd "${{ github.workspace }}"
-        dotnet build
+        dotnet build -c Release
       shell: pwsh
       
     - name: Upload artifact
