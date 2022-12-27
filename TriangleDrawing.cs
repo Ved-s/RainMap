@@ -87,11 +87,18 @@ namespace RainMap
             Triangles++;
         }
 
-        public static void AddQuad(Vector2 a, Vector2 b, Vector2 c, Vector2 d, Color color)
+        public static void AddQuad(Vector2 tl, Vector2 tr, Vector2 bl, Vector2 br, Color color)
         {
             EnsureVertSize(Triangles * 3 + 6);
-            AddTriangle(a, b, c, color);
-            AddTriangle(c, b, d, color);
+            AddTriangle(tl, tr, bl, color);
+            AddTriangle(bl, tr, br, color);
+        }
+
+        public static void AddQuad(Vector2 tl, Color colorTL, Vector2 tr, Color colorTR, Vector2 bl, Color colorBL, Vector2 br, Color colorBR)
+        {
+            EnsureVertSize(Triangles * 3 + 6);
+            AddTriangle(tl, colorTL, tr, colorTR, bl, colorBL);
+            AddTriangle(bl, colorBL, tr, colorTR, br, colorBR);
         }
     }
 }

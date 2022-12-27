@@ -787,7 +787,7 @@ namespace RainMap
                                 break;
                         }
 
-                    for (int i = 0; i <= 6; i++)
+                    for (int i = 0; i < 7; i++)
                     {
                         Tile.TileAttributes feature = (Tile.TileAttributes)(1 << i);
                         if ((tile.Attributes & feature) == 0)
@@ -822,6 +822,35 @@ namespace RainMap
                             case Tile.TileAttributes.GarbageHole:
                                 break;
                             case Tile.TileAttributes.WormGrass:
+                                for (int j = 0; j < 4; j++)
+                                {
+                                    float height = (Math.Abs(x * 98436511 * y * 873569822 * j * 875983916) % 1024) / 1024f * 0.5f + 0.4f;
+
+                                    float top = y + 1 - height;
+                                    float bottom = y + 1;
+                                    float left = x + (j * 0.25f);
+                                    float right = left + 0.25f;
+
+                                    Color topColor = new Color(.2f, .2f, .2f) * solidAlpha;
+                                    Color bottomColor = Color.Black * solidAlpha;
+
+                                    TriangleDrawing.AddQuad(
+                                        new(left, top),      topColor,
+                                        new(right, top),     topColor,
+                                        new(left, bottom),   bottomColor,
+                                        new(right, bottom),  bottomColor);
+
+                                    bottom = top + 0.05f;
+                                    top -= 0.10f;
+                                    left += 0.05f;
+                                    right -= 0.05f;
+
+                                    TriangleDrawing.AddQuad(
+                                        new(left, top),
+                                        new(right, top),
+                                        new(left, bottom),
+                                        new(right, bottom), Color.Blue);
+                                }
                                 break;
                         }
                     }
