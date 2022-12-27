@@ -30,8 +30,8 @@ jobs:
         dotnet build
       shell: pwsh
       
-    #- name: Upload artifact
-    #  uses: actions/upload-artifact@v3
-    #  with:
-    #    name: Build
-    #    path: bin/Release/net6.0-windows
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Build
+        path: bin/Release/net6.0-windows
