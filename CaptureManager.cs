@@ -144,15 +144,16 @@ namespace RainMap
             {
                 int texWidth = source?.Width ?? texture.Width;
                 int texHeight = source?.Height ?? texture.Height;
-                bool cap = Capturing;
+                if (Capturing)
+                {
+                    Vector2 scale = worldSize is null ? Vector2.One : worldSize.Value / new Vector2(texWidth, texHeight);
+                    Main.SpriteBatch.Draw(texture, TransformVector(worldPos), source, color ?? Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0);
+                    return;
+                }
 
-                if (!cap)
-                    BeginCapture(texWidth, texHeight);
-
+                BeginCapture(texWidth, texHeight);
                 Main.SpriteBatch.Draw(texture, Vector2.Zero, source, color ?? Color.White, 0f, Vector2.Zero, 1f, SpriteEffects.None, 0);
-
-                if (!cap)
-                    EndCapture(worldPos, texWidth, texHeight);
+                EndCapture(worldPos, texWidth, texHeight);
             }
 
             public override void DrawRect(Vector2 worldPos, Vector2 size, Color? fill, Color? border = null, float thickness = 1)

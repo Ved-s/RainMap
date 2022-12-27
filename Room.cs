@@ -430,6 +430,7 @@ namespace RainMap
 
             return direction;
         }
+        public Tile GetTile(Point pos) => GetTile(pos.X, pos.Y);
         public Tile GetTile(int x, int y)
         {
             x = Math.Clamp(x, 0, Size.X - 1);
@@ -706,8 +707,6 @@ namespace RainMap
             TriangleDrawing.ClampTL = CameraPositions[screenIndex] / 20;
             TriangleDrawing.ClampBR = (CameraPositions[screenIndex] + (CameraScreens[screenIndex]?.Texture.Size() ?? Vector2.Zero)) / 20;
 
-            //TriangleDrawing.AddQuad(new(10, 10), new(100, 10), new(10, 100), new(100, 100), Color.Lime * 0.5f);
-
             int xstart = (int)(CameraPositions[screenIndex].X / 20) - 1;
             int ystart = (int)(CameraPositions[screenIndex].Y / 20) - 1;
             int xend = (int)((CameraPositions[screenIndex].X + CameraScreens[screenIndex]?.Texture.Width ?? 0) / 20) + 1;
@@ -720,6 +719,7 @@ namespace RainMap
                 for (int x = xstart; x < xend; x++)
                 {
                     Tile tile = GetTile(x, y);
+                    bool oob = x < 0 || y < 0 || x >= Size.X || y >= Size.Y;
 
                     switch (tile.Terrain)
                     {
@@ -740,9 +740,33 @@ namespace RainMap
                         case Tile.TerrainType.ShortcutEntrance:
                             TriangleDrawing.AddQuad(new(x + .2f, y + .5f), new(x + .5f, y + .2f), new(x + .5f, y + .8f), new(x + .8f, y + .5f), Color.White * solidAlpha);
                             break;
+
+                        case Tile.TerrainType.Slope:
+                            if (water)
+                                TriangleDrawing.AddQuad(new(x, y), new(x + 1, y), new(x, y + 1), new(x + 1, y + 1), Color.Blue * water2Alpha);
+
+                            for (int i = 0; i < 4; i++)
+                            {
+                                Point dirR = Directions[i];
+                                Point dirL = Directions[(i + 1) % 4];
+
+                                Tile right = GetTile(new Point(x, y) + dirR);
+                                Tile left = GetTile(new Point(x, y) + dirL);
+
+                                if (right.Terrain != Tile.TerrainType.Solid || left.Terrain != Tile.TerrainType.Solid)
+                                    continue;
+
+                                Vector2 center = new(x + .5f, y + .5f);
+                                Vector2 a = (dirR + dirL).ToVector2() / 2;
+                                Vector2 b = new(-a.Y, a.X);
+                                Vector2 c = -b;
+
+                                TriangleDrawing.AddTriangle(center + a, center + b, center + c, Color.Black * solidAlpha);
+                            }
+                            break;
                     }
 
-                    if (tile.Terrain != Tile.TerrainType.ShortcutEntrance && x >= 0 && y >= 0 && x < Size.X && y < Size.Y && renderer.Scale > 0.1f)
+                    if (tile.Terrain != Tile.TerrainType.ShortcutEntrance && !oob && renderer.Scale > 0.1f)
                         switch (tile.Shortcut)
                         {
                             case Tile.ShortcutType.Normal:
@@ -802,10 +826,10 @@ namespace RainMap
                         }
                     }
 
-                    if (water && tile.Terrain != Tile.TerrainType.Solid && (x == xend - 1 || GetTile(x + 1, y).Terrain == Tile.TerrainType.Solid))
+                    if (water && (tile.Terrain is not Tile.TerrainType.Solid and not Tile.TerrainType.Slope && (x == xend - 1 || GetTile(x + 1, y).Terrain is Tile.TerrainType.Solid or Tile.TerrainType.Slope)))
                     {
                         int width = 1;
-                        while (x - width >= xstart && GetTile(x - width, y).Terrain != Tile.TerrainType.Solid)
+                        while (x - width >= xstart && GetTile(x - width, y).Terrain is not Tile.TerrainType.Solid and not Tile.TerrainType.Slope)
                             width++;
 
                         TriangleDrawing.AddQuad(new(x - width + 1, y), new(x + 1, y), new(x - width + 1, y + 1), new(x + 1, y + 1), Color.Blue * water2Alpha);
