@@ -93,7 +93,7 @@ float4 MainPS(ShaderData i) : COLOR
 
         if (shadow != 1 && red >= 5)
         {
-            float2 grabPos = float2(i.uv.x + -_lightDirAndPixelSize.x * _lightDirAndPixelSize.z * (red - 5), 1 - i.uv.y + -_lightDirAndPixelSize.y * _lightDirAndPixelSize.w * (red - 5));
+            float2 grabPos = float2(i.uv.x + -_lightDirAndPixelSize.x * _lightDirAndPixelSize.z * (red - 5), i.uv.y + -_lightDirAndPixelSize.y * _lightDirAndPixelSize.w * (red - 5));
             grabPos = ((grabPos - float2(0.5, 0.3)) * (1 + (red - 5.0) / 460.0)) + float2(0.5, 0.3);
             float4 grabTexCol2 = SampleGrab(grabPos);
             if (grabTexCol2.x != 0.0 || grabTexCol2.y != 0.0 || grabTexCol2.z != 0.0)
@@ -108,8 +108,7 @@ float4 MainPS(ShaderData i) : COLOR
 
         if (effectCol == 100)
         {
-            float4 decalCol = tex2D(LevelTex
-        , float2((255.5 - texcol.z * 255.0) / 1400.0, 1 - 799.5 / 800.0));
+            float4 decalCol = tex2D(LevelTex, float2((255.5 - texcol.z * 255.0) / 1400.0, 1 - 799.5 / 800.0));
             if (paletteColor == 2) 
                 decalCol = lerp(decalCol, float4(1, 1, 1, 1), 0.2 - shadow * 0.1);
 
@@ -157,7 +156,7 @@ float4 MainPS(ShaderData i) : COLOR
         float4 grabTexCol = SampleGrab(i.uv);
         if (grabTexCol.x > 1.0 / 255.0 || grabTexCol.y != 0.0 || grabTexCol.z != 0.0)
         {
-            setColor.w = 0;
+            setColor *= 0;
         }
     }
     return setColor;

@@ -73,7 +73,7 @@ namespace RainMap.Renderers
                 Colors = new Rgba32[RenderTarget.Width * RenderTarget.Height];
         }
 
-        public override void DrawTexture(Texture2D texture, Vector2 worldPos, Microsoft.Xna.Framework.Rectangle? source = null, Vector2? worldSize = null, Color? color = null)
+        public override void DrawTexture(Texture2D texture, Vector2 worldPos, Microsoft.Xna.Framework.Rectangle? source = null, Vector2? worldSize = null, Color? color = null, Vector2? scaleOverride = null)
         {
             int texWidth = source?.Width ?? texture.Width;
             int texHeight = source?.Height ?? texture.Height;
@@ -85,7 +85,7 @@ namespace RainMap.Renderers
             }
 
             BeginCapture(texWidth, texHeight);
-            Main.SpriteBatch.Draw(texture, Vector2.Zero, source, color ?? Color.White, 0f, Vector2.Zero, 1f, SpriteEffects.None, 0);
+            Main.SpriteBatch.Draw(texture, Vector2.Zero, source, color ?? Color.White, 0f, Vector2.Zero, scaleOverride ?? Vector2.One, SpriteEffects.None, 0);
             EndCapture(worldPos, texWidth, texHeight);
         }
 

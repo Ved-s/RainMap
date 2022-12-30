@@ -14,12 +14,19 @@ namespace RainMap.Renderers
             SpriteBatch = spriteBatch;
         }
 
-        public override void DrawTexture(Texture2D texture, Vector2 worldPos, Rectangle? source, Vector2? worldSize, Color? color)
+        public override void DrawTexture(Texture2D texture, Vector2 worldPos, Rectangle? source, Vector2? worldSize, Color? color, Vector2? scaleOverride = null)
         {
-            Vector2 texSize = source?.Size.ToVector2() ?? texture.Size();
-            Vector2 texScale = worldSize.HasValue ? worldSize.Value / texSize : Vector2.One;
+            Vector2 texScale;
+            if (scaleOverride.HasValue)
+                texScale = scaleOverride.Value;
+            else
+            {
+                Vector2 texSize = source?.Size.ToVector2() ?? texture.Size();
+                texScale = worldSize.HasValue ? worldSize.Value / texSize : Vector2.One;
+                texScale *= Scale;
+            }
 
-            SpriteBatch.Draw(texture, TransformVector(worldPos), source, color ?? Color.White, 0f, Vector2.Zero, texScale * Scale, SpriteEffects.None, 0);
+            SpriteBatch.Draw(texture, TransformVector(worldPos), source, color ?? Color.White, 0f, Vector2.Zero, texScale, SpriteEffects.None, 0);
         }
 
         public override void DrawRect(Vector2 worldPos, Vector2 size, Color? fill, Color? border = null, float thickness = 1)

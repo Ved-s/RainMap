@@ -351,6 +351,29 @@ namespace RainMap
             if (texture is null)
                 return;
 
+            GrabBuffer.Clear();
+
+            float scale = Math.Min(1, renderer.Scale);
+            float scale2 = Math.Max(1, renderer.Scale);
+
+            GrabBuffer.Begin(texture.Texture.Size(), scale, CameraPositions[index]);
+
+            Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
+            bool mouse = IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50));
+
+            //if (mouse)
+            //{
+            //    Main.SpriteBatch.Begin(blendState: BlendState.AlphaBlend);
+            //    GrabBuffer.Renderer.DrawRect(mouseWorld - WorldPos - new Vector2(50), new(100), Color.Cyan);
+            //    Main.SpriteBatch.End();
+            //}
+
+            GrabBuffer.End();
+            
+            Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            renderer.DrawTexture(GrabBuffer.Target!, CameraPositions[index] + WorldPos, GrabBuffer.CurrentSource, texture.Texture.Size(), Color.White, Vector2.One * scale2);
+            Main.SpriteBatch.End();
+
             if (Main.RenderRoomLevel)
             {
                 Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
@@ -359,6 +382,7 @@ namespace RainMap
                 {
                     Main.RoomColor.Parameters["Projection"]?.SetValue(renderer.Projection);
                     ApplyPaletteToShader(Main.RoomColor, index);
+                    GrabBuffer.ApplyToShader(Main.RoomColor);
 
                     if (Settings?.EffectColorA is not null)
                         Main.RoomColor.Parameters["EffectColorA"]?.SetValue(Settings.EffectColorA.Value);
@@ -374,8 +398,8 @@ namespace RainMap
 
                 Main.SpriteBatch.End();
 
-                //Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
-                //if (IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50)))
+                //
+                //if ()
                 //    DrawLight(renderer, mouseWorld - WorldPos, 400, Color.White, index);
 
                 DrawWater(renderer, index);
@@ -633,6 +657,7 @@ namespace RainMap
             if (vertexIndex > 3)
             {
                 ApplyPaletteToShader(Main.WaterSurface, screenIndex);
+                GrabBuffer.ApplyToShader(Main.WaterSurface);
                 Main.WaterSurface.Parameters["LevelTex"].SetValue(CameraScreens[screenIndex]!.Texture);
                 Main.WaterSurface.Parameters["Projection"].SetValue(roomMatrix);
                 Main.WaterSurface.Parameters["_waterDepth"].SetValue(WaterInFrontOfTerrain ? 0 : 1f / 30);
@@ -687,6 +712,7 @@ namespace RainMap
             if (vertexIndex > 3)
             {
                 ApplyPaletteToShader(Main.WaterColor, screenIndex);
+                GrabBuffer.ApplyToShader(Main.WaterColor);
 
                 Main.WaterColor.Parameters["LevelTex"].SetValue(CameraScreens[screenIndex]!.Texture);
                 Main.WaterColor.Parameters["Projection"].SetValue(roomMatrix);
