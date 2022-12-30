@@ -1,11 +1,12 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using RainMap.Renderers;
+using RainMap.Structures;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace RainMap
@@ -352,7 +353,6 @@ namespace RainMap
 
             if (Main.RenderRoomLevel)
             {
-
                 Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
 
                 if (Main.RoomColor is not null)
@@ -374,17 +374,13 @@ namespace RainMap
 
                 Main.SpriteBatch.End();
 
-                Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
-
-                if (IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50)))
-                    DrawLight(renderer, mouseWorld - WorldPos, 400, Color.White, index);
+                //Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
+                //if (IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50)))
+                //    DrawLight(renderer, mouseWorld - WorldPos, 400, Color.White, index);
 
                 DrawWater(renderer, index);
             }
             DrawTileOverlay(renderer, index);
-            //Main.SpriteBatch.Begin();
-            //Main.SpriteBatch.DrawStringShaded(Main.Consolas10, $"F: {Settings?.FadePaletteValues?[index]}", renderer.TransformVector(WorldPos + CameraPositions[index]), Color.Yellow);
-            //Main.SpriteBatch.End();
         }
         public void UpdateScreenSize()
         {
@@ -978,79 +974,6 @@ namespace RainMap
         public override string ToString()
         {
             return Name;
-        }
-
-        public struct Tile
-        {
-            public TerrainType Terrain;
-            public ShortcutType Shortcut;
-            public TileAttributes Attributes;
-
-            [Flags]
-            public enum TileAttributes
-            {
-                None = 0,
-                VerticalBeam = 1,
-                HorizontalBeam = 2,
-                WallBehind = 4,
-                Hive = 8,
-                Waterfall = 16,
-                GarbageHole = 32,
-                WormGrass = 64
-            }
-
-            public enum TerrainType
-            {
-                Air,
-                Solid,
-                Slope,
-                Floor,
-                ShortcutEntrance
-            }
-
-            public enum ShortcutType
-            {
-                None,
-                Normal,
-                RoomExit,
-                CreatureHole,
-                NPCTransportation,
-                RegionTransportation,
-            }
-        }
-
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        public struct WaterVertex : IVertexType
-        {
-            public Vector2 Position;
-            public Vector2 TextureCoord;
-            public float Depth;
-
-            public VertexDeclaration VertexDeclaration => Declaration;
-            static VertexDeclaration Declaration = new(new VertexElement[]
-            {
-                new(0, VertexElementFormat.Vector2, VertexElementUsage.Position, 0),
-                new(8, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 0),
-                new(16, VertexElementFormat.Single, VertexElementUsage.TextureCoordinate, 1),
-            });
-        }
-
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        public struct LightVertex : IVertexType
-        {
-            public Vector2 Position;
-            public Vector2 LightTextureCoord;
-            public Vector2 LevelTextureCoord;
-            public Color   Color;
-
-            public VertexDeclaration VertexDeclaration => Declaration;
-            static VertexDeclaration Declaration = new(new VertexElement[]
-            {
-                new(0, VertexElementFormat.Vector2, VertexElementUsage.Position, 0),
-                new(8, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 0),
-                new(16, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 1),
-                new(24, VertexElementFormat.Color, VertexElementUsage.Color, 0),
-            });
         }
 
         public class WaterData

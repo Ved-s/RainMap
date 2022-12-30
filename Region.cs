@@ -1,5 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using RainMap.Renderers;
 using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.Processing;
 using System;
@@ -275,7 +276,7 @@ namespace RainMap
 
             while (t < 1)
             {
-                Vector2 velocity = Drawing.CalcCubicBezier1(a, b, c, d, t) * tFac;
+                Vector2 velocity = Bezier.CalcCubicBezier1(a, b, c, d, t) * tFac;
                 float bezLength = velocity.Length() * renderer.Scale;
 
                 if (bezLength == 0)
@@ -305,8 +306,8 @@ namespace RainMap
 
                     if (alternator)
                     {
-                        Vector2 lineA = Drawing.CalcCubicBezier0(a, b, c, d, MathHelper.Clamp(t + tLastOff.Value, 0, 1));
-                        Vector2 lineB = Drawing.CalcCubicBezier0(a, b, c, d, MathHelper.Clamp(tNext + tOff, 0, 1));
+                        Vector2 lineA = Bezier.CalcCubicBezier0(a, b, c, d, MathHelper.Clamp(t + tLastOff.Value, 0, 1));
+                        Vector2 lineB = Bezier.CalcCubicBezier0(a, b, c, d, MathHelper.Clamp(tNext + tOff, 0, 1));
 
                         renderer.DrawLine(lineA, lineB, Color.White, 2);
                     }

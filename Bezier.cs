@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace RainMap
 {
-    public static class Drawing
+    public static class Bezier
     {
         public static Vector2 CalcCubicBezier0(Vector2 a, Vector2 b, Vector2 c, Vector2 d, float t)
         {

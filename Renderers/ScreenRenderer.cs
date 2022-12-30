@@ -1,0 +1,35 @@
+﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+
+namespace RainMap.Renderers
+{
+    public abstract class ScreenRenderer : Renderer
+    {
+        public SpriteBatch SpriteBatch { get; }
+
+        public override Vector2 Size => SpriteBatch.GraphicsDevice.Viewport.Bounds.Size.ToVector2();
+
+        public ScreenRenderer(SpriteBatch spriteBatch)
+        {
+            SpriteBatch = spriteBatch;
+        }
+
+        public override void DrawTexture(Texture2D texture, Vector2 worldPos, Rectangle? source, Vector2? worldSize, Color? color)
+        {
+            Vector2 texSize = source?.Size.ToVector2() ?? texture.Size();
+            Vector2 texScale = worldSize.HasValue ? worldSize.Value / texSize : Vector2.One;
+
+            SpriteBatch.Draw(texture, TransformVector(worldPos), source, color ?? Color.White, 0f, Vector2.Zero, texScale * Scale, SpriteEffects.None, 0);
+        }
+
+        public override void DrawRect(Vector2 worldPos, Vector2 size, Color? fill, Color? border = null, float thickness = 1)
+        {
+            SpriteBatch.DrawRect(TransformVector(worldPos), size * Scale, fill, border, thickness);
+        }
+
+        public override void DrawLine(Vector2 worldPosA, Vector2 worldPosB, Color color, float thickness = 1)
+        {
+            SpriteBatch.DrawLine(TransformVector(worldPosA), TransformVector(worldPosB), color, thickness);
+        }
+    }
+}

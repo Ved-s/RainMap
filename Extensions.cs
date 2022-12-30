@@ -86,6 +86,5 @@ namespace RainMap
         {
             spriteBatch.DrawRect(pos - new Vector2(size/2), new Vector2(size), color);
         }
-
     }
 }

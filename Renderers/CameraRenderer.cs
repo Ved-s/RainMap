@@ -1,11 +1,10 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using RainMap;
 using System;
 using System.Diagnostics;
 
-namespace RainMap
+namespace RainMap.Renderers
 {
     public class CameraRenderer : ScreenRenderer
     {
@@ -41,7 +40,7 @@ namespace RainMap
             SetScale(zoom, screenPos);
         }
 
-        void SetScale(float scale, Vector2 at) 
+        void SetScale(float scale, Vector2 at)
         {
             if (scale == Scale) return;
             Vector2 atWorldBefore = InverseTransformVector(at);
@@ -50,7 +49,7 @@ namespace RainMap
             Position -= atWorldAfter - atWorldBefore;
         }
 
-        void UpdateDragging(bool drag, Vector2 screenPos) 
+        void UpdateDragging(bool drag, Vector2 screenPos)
         {
             if (drag && !Dragging)
             {
@@ -62,7 +61,7 @@ namespace RainMap
                 Position -= (screenPos - DragPos) / Scale;
                 DragPos = screenPos;
             }
-            else if (!drag && Dragging) 
+            else if (!drag && Dragging)
             {
                 Dragging = false;
             }
