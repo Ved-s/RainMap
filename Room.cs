@@ -45,6 +45,14 @@ namespace RainMap
         Vector2[] FixedCameraPositions = null!;
         bool DoneFullScreenUpdate = false;
 
+        static LightVertex[] LightVertices = new LightVertex[4]
+        {
+            new() { LightTextureCoord = new(0, 0) },
+            new() { LightTextureCoord = new(1, 0) },
+            new() { LightTextureCoord = new(0, 1) },
+            new() { LightTextureCoord = new(1, 1) },
+        };
+
         public string FilePath = null!;
 
         public static Room Load(string roomPath)
@@ -366,6 +374,11 @@ namespace RainMap
 
                 Main.SpriteBatch.End();
 
+                Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
+
+                if (IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50)))
+                    DrawLight(renderer, mouseWorld - WorldPos, 400, Color.White, index);
+
                 DrawWater(renderer, index);
             }
             DrawTileOverlay(renderer, index);
@@ -438,7 +451,24 @@ namespace RainMap
             return Tiles[x, y];
         }
 
-        private void UpdateWater()
+        public void ApplyPaletteToShader(Effect effect, int screenIndex)
+        {
+            effect.Parameters["PaletteTex"]?.SetValue(Palettes.GetPalette(Settings?.Palette ?? 0));
+            effect.Parameters["FadePaletteTex"]?.SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
+            if (FadePosValCache is not null)
+                effect.Parameters["FadePosValTex"]?.SetValue(FadePosValCache);
+            effect.Parameters["FadeSize"]?.SetValue(CameraPositions.Length);
+            effect.Parameters["FadeRect"]?.SetValue(new Vector4()
+            {
+                X = (CameraPositions[screenIndex].X - ScreenStart.X) / ScreenSize.X,
+                Y = (CameraPositions[screenIndex].X + (CameraScreens[screenIndex]?.Texture.Width ?? 0) - ScreenStart.X) / ScreenSize.X,
+                Z = (CameraPositions[screenIndex].Y - ScreenStart.Y) / ScreenSize.Y,
+                W = (CameraPositions[screenIndex].Y + (CameraScreens[screenIndex]?.Texture.Height ?? 0) - ScreenStart.Y) / ScreenSize.Y,
+            });
+
+        }
+
+        void UpdateWater()
         {
             if (Water is null || Main.KeyboardState.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.P))
                 return;
@@ -877,21 +907,41 @@ namespace RainMap
             TriangleDrawing.Draw(Main.PixelEffect);
         }
 
-        public void ApplyPaletteToShader(Effect effect, int screenIndex)
+        void DrawLight(Renderer renderer, Vector2 pos, float rad, Color color, int screen)
         {
-            effect.Parameters["PaletteTex"]?.SetValue(Palettes.GetPalette(Settings?.Palette ?? 0));
-            effect.Parameters["FadePaletteTex"]?.SetValue(Palettes.GetPalette(Settings?.FadePalette ?? 0));
-            if (FadePosValCache is not null)
-                effect.Parameters["FadePosValTex"]?.SetValue(FadePosValCache);
-            effect.Parameters["FadeSize"]?.SetValue(CameraPositions.Length);
-            effect.Parameters["FadeRect"]?.SetValue(new Vector4()
-            {
-                X = (CameraPositions[screenIndex].X - ScreenStart.X) / ScreenSize.X,
-                Y = (CameraPositions[screenIndex].X + (CameraScreens[screenIndex]?.Texture.Width ?? 0) - ScreenStart.X) / ScreenSize.X,
-                Z = (CameraPositions[screenIndex].Y - ScreenStart.Y) / ScreenSize.Y,
-                W = (CameraPositions[screenIndex].Y + (CameraScreens[screenIndex]?.Texture.Height ?? 0) - ScreenStart.Y) / ScreenSize.Y,
-            });
+            LightVertices[0].Position = pos + new Vector2(-rad, -rad);
+            LightVertices[1].Position = pos + new Vector2(rad, -rad);
+            LightVertices[2].Position = pos + new Vector2(-rad, rad);
+            LightVertices[3].Position = pos + new Vector2(rad, rad);
 
+            LightVertices[0].Color = color;
+            LightVertices[1].Color = color;
+            LightVertices[2].Color = color;
+            LightVertices[3].Color = color;
+
+            Vector2 screenPos = pos - CameraPositions[screen];
+            Vector2 screenSize = CameraScreens[screen]?.Texture.Size() ?? Vector2.One;
+
+            Vector2 topLeftUV = (screenPos - new Vector2(rad)) / screenSize;
+            Vector2 bottomRightUV = (screenPos + new Vector2(rad)) / screenSize;
+
+            LightVertices[0].LevelTextureCoord = topLeftUV;
+            LightVertices[1].LevelTextureCoord = new(bottomRightUV.X, topLeftUV.Y);
+            LightVertices[2].LevelTextureCoord = new(topLeftUV.X, bottomRightUV.Y);
+            LightVertices[3].LevelTextureCoord = bottomRightUV;
+
+            Matrix matrix = Matrix.CreateTranslation(new(WorldPos, 0));
+            matrix = Matrix.Multiply(matrix, renderer.Transform);
+            matrix = Matrix.Multiply(matrix, renderer.Projection);
+
+            Main.LightSource.Parameters["MainTex"]?.SetValue(Main.Pixel);
+            Main.LightSource.Parameters["LevelTex"]?.SetValue(CameraScreens[screen]?.Texture ?? Main.Pixel);
+            Main.LightSource.Parameters["Projection"]?.SetValue(matrix);
+            Main.Instance.GraphicsDevice.BlendState = BlendState.AlphaBlend;
+            Main.Instance.GraphicsDevice.SamplerStates[1] = SamplerState.PointClamp;
+            Main.LightSource.CurrentTechnique.Passes[0].Apply();
+            
+            Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, LightVertices, 0, 2);
         }
 
         void FixCameraPositions()
@@ -982,6 +1032,24 @@ namespace RainMap
                 new(0, VertexElementFormat.Vector2, VertexElementUsage.Position, 0),
                 new(8, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 0),
                 new(16, VertexElementFormat.Single, VertexElementUsage.TextureCoordinate, 1),
+            });
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct LightVertex : IVertexType
+        {
+            public Vector2 Position;
+            public Vector2 LightTextureCoord;
+            public Vector2 LevelTextureCoord;
+            public Color   Color;
+
+            public VertexDeclaration VertexDeclaration => Declaration;
+            static VertexDeclaration Declaration = new(new VertexElement[]
+            {
+                new(0, VertexElementFormat.Vector2, VertexElementUsage.Position, 0),
+                new(8, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 0),
+                new(16, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 1),
+                new(24, VertexElementFormat.Color, VertexElementUsage.Color, 0),
             });
         }
 

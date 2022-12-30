@@ -20,6 +20,12 @@
 /processorParam:TextureFormat=Compressed
 /build:Consolas10.spritefont
 
+#begin LightSource.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:LightSource.fx
+
 #begin RoomColor.fx
 /importer:EffectImporter
 /processor:EffectProcessor
@@ -31,12 +37,6 @@
 /processor:EffectProcessor
 /processorParam:DebugMode=Auto
 /build:WaterColor.fx
-
-#begin WaterSurface.fx
-/importer:EffectImporter
-/processor:EffectProcessor
-/processorParam:DebugMode=Auto
-/build:WaterSurface.fx
 
 #begin WaterSurface.fx
 /importer:EffectImporter

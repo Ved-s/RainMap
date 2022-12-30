@@ -22,6 +22,7 @@ namespace RainMap
         public static Effect RoomColor = null!;
         public static Effect WaterColor = null!;
         public static Effect WaterSurface = null!;
+        public static Effect LightSource = null!;
         public static SpriteFont Consolas10 = null!;
 
         public static Texture2D? Noise;
@@ -82,6 +83,7 @@ namespace RainMap
             RoomColor = Content.Load<Effect>("RoomColor");
             WaterColor = Content.Load<Effect>("WaterColor");
             WaterSurface = Content.Load<Effect>("WaterSurface");
+            LightSource = Content.Load<Effect>("LightSource");
             Consolas10 = Content.Load<SpriteFont>("Consolas10");
 
             Pixel = new(GraphicsDevice, 1, 1);
