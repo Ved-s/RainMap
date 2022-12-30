@@ -1,7 +1,7 @@
+#include "GrabShader.fx"
+
 sampler2D MainTex : register(s0);
 sampler2D LevelTex;
-
-sampler2D GrabTexture;
 
 float4x4 Projection;
 
@@ -43,8 +43,7 @@ float4 MainPS(ShaderData data) : COLOR
     //float2 highLightPos = data.leveluv - (dir * lerp(0.002, 0.01, abs((6.0/30.0)-dist)) * pow(sin(centerDist*3.14*2), 0.2));
     float2 highLightPos = data.leveluv - (dir * 0.003 * pow(centerDist*2, 0.25));
 
-    //float2 oldShadowPos = i.scrPos.xy - (dir * pow(centerDist, 1.25) * pow(dist, 1.5) * 0.3);
-    //oldShadowPos.y = 1-oldShadowPos.y;
+    float2 oldShadowPos = data.leveluv - (dir * pow(centerDist, 1.25) * pow(dist, 1.5) * 0.3);
 
     texcol = tex2D(LevelTex, shadowPos);
     red = texcol.x * 255 - 1;
@@ -58,20 +57,19 @@ float4 MainPS(ShaderData data) : COLOR
     if(texcol.x == 1.0 && texcol.y == 1.0 && texcol.z == 1.0) 
         highLightDist = 1.0;
 
-    // TODO: Grab texture
-    //if (dist > 5.0/30.0)
-    //{
-    //    float4 grabColor = tex2D(GrabTexture, float2(i.scrPos.x, 1.0-i.scrPos.y));
-    //    if( grabColor.x > 1.0/255.0 || grabColor.y != 0.0 || grabColor.z != 0.0) 
-    //        return float4(0,0,0,0);
-    //}
+    if (dist > 5.0/30.0)
+    {
+        float4 grabColor = SampleGrab(data.leveluv);
+        if( grabColor.x > 1.0/255.0 || grabColor.y != 0.0 || grabColor.z != 0.0) 
+            return float4(0,0,0,0);
+    }
 
-    //if (shadowDist > 5.0/30.0)
-    //{
-    //    float4 grabColor = tex2D(GrabTexture, oldShadowPos);
-    //    if( grabColor.x > 1.0/255.0 || grabColor.y != 0.0 || grabColor.z != 0.0) 
-    //        shadowDist = 6.0/30.0;
-    //}
+    if (shadowDist > 5.0/30.0)
+    {
+        float4 grabColor = SampleGrab(oldShadowPos);
+        if( grabColor.x > 1.0/255.0 || grabColor.y != 0.0 || grabColor.z != 0.0) 
+            shadowDist = 6.0/30.0;
+    }
 
     float shadow = dist - shadowDist - (paletteColor == 1 ? 0 : 2.0/30.0);
     shadow = pow(clamp(shadow, 0, 1), lerp(1.0-dist, 0.5, 0.5));
@@ -110,7 +108,7 @@ float4 MainPS(ShaderData data) : COLOR
         highLight = 0;
     }
 
-    dist *= clamp(1 - length(0.5 - data.uv) * 2, 0, 1); //tex2D(MainTex, data.uv.xy).x;
+    dist *= tex2D(MainTex, data.uv.xy).x;
 
     float alpha = clamp(dist * data.color.w * (0.65 + highLight * 0.35), 0, 1);
     return float4(data.color.xyz, 1) * alpha;

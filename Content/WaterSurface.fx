@@ -1,4 +1,5 @@
 ﻿#include "PaletteShader.fx"
+#include "GrabShader.fx"
 
 sampler2D LevelTex : register(s0);
 
@@ -31,12 +32,12 @@ float4 MainPS(ShaderData data) : COLOR
         if (red < _waterDepth * 31 || red / 30.0 < data.depth) // + lerp(0.02, -0.075, 1.0 - _waterDepth * 31.0))
             return 0;
 
-    //if (i.uv.y + lerp(0.02, -0.075, 1.0 - _waterDepth * 31.0) > 6.0 / 30.0)
-    //{
-    //    half4 grabColor = tex2D(_GrabTexture, half2(i.scrPos.x, 1.0 - i.scrPos.y));
-    //    if (grabColor.x > 1.0 / 255.0 || grabColor.y != 0.0 || grabColor.z != 0.0) 
-    //        return float4(0, 0, 0, 0);
-    //}
+    if (data.uv.y + lerp(0.02, -0.075, 1.0 - _waterDepth * 31.0) > 6.0 / 30.0)
+    {
+        float4 grabColor = SampleGrab(data.uv);
+        if (grabColor.x > 1.0 / 255.0 || grabColor.y != 0.0 || grabColor.z != 0.0) 
+            return float4(0, 0, 0, 0);
+    }
     float fade = CacheFade(data.uv);
     
     float4 watercolor = lerp(SamplePalette(4, 7, fade), SamplePalette(7, 7, fade), data.depth);

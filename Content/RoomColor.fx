@@ -1,8 +1,8 @@
 ﻿#include "PaletteShader.fx"
+#include "GrabShader.fx"
 
 sampler2D LevelTex : register(s0);
 sampler2D NoiseTex;
-sampler2D GrabTex;
 sampler2D EffectColors;
 
 float4x4 Projection;
@@ -43,9 +43,7 @@ float4 MainPS(ShaderData i) : COLOR
     float displace = tex2D(NoiseTex, float2((i.uv.x * 1.5) - ugh + (_RAIN * 0.01), (i.uv.y * 0.25) - ugh + _RAIN * 0.05)).x;
     displace = clamp((sin((displace + i.uv.x + i.uv.y + _RAIN * 0.1) * 3 * 3.14) - 0.95) * 20, 0, 1);
 
-    float2 screenPos = float2(lerp(_spriteRect.x, _spriteRect.z, i.uv.x), lerp(_spriteRect.y, _spriteRect.w, i.uv.y));
-
-    if (_WetTerrain < 0.5 || 1 - screenPos.y > _waterLevel) 
+    if (_WetTerrain < 0.5 || i.uv.y > _waterLevel) 
         displace = 0;
 
     float4 texcol = tex2D(LevelTex, float2(i.uv.x, i.uv.y + displace * 0.001));
@@ -95,10 +93,9 @@ float4 MainPS(ShaderData i) : COLOR
 
         if (shadow != 1 && red >= 5)
         {
-            float2 grabPos = float2(screenPos.x + -_lightDirAndPixelSize.x * _lightDirAndPixelSize.z * (red - 5), 1 - screenPos.y + -_lightDirAndPixelSize.y * _lightDirAndPixelSize.w * (red - 5));
+            float2 grabPos = float2(i.uv.x + -_lightDirAndPixelSize.x * _lightDirAndPixelSize.z * (red - 5), 1 - i.uv.y + -_lightDirAndPixelSize.y * _lightDirAndPixelSize.w * (red - 5));
             grabPos = ((grabPos - float2(0.5, 0.3)) * (1 + (red - 5.0) / 460.0)) + float2(0.5, 0.3);
-            float4 grabTexCol2 = tex2D(
-            GrabTex, grabPos);
+            float4 grabTexCol2 = SampleGrab(grabPos);
             if (grabTexCol2.x != 0.0 || grabTexCol2.y != 0.0 || grabTexCol2.z != 0.0)
             {
                 shadow = 1;
@@ -157,8 +154,7 @@ float4 MainPS(ShaderData i) : COLOR
     
     if (checkMaskOut)
     {
-        float4 grabTexCol = tex2D(
-        GrabTex, float2(screenPos.x, 1 - screenPos.y));
+        float4 grabTexCol = SampleGrab(i.uv);
         if (grabTexCol.x > 1.0 / 255.0 || grabTexCol.y != 0.0 || grabTexCol.z != 0.0)
         {
             setColor.w = 0;

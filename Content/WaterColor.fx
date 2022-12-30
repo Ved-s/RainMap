@@ -1,8 +1,8 @@
 #include "PaletteShader.fx"
+#include "GrabShader.fx"
 
 sampler2D LevelTex : register(s0);
 sampler2D NoiseTex;
-sampler2D GrabTexture;
 
 float _RAIN;
 float2 _screenOff;
@@ -28,7 +28,7 @@ void MainVS(inout ShaderData data)
 	//data.depth = 1-data.uv.y;
 }
 
-float4 MainPS(ShaderData data, float2 scrPos : VPOS) : COLOR
+float4 MainPS(ShaderData data) : COLOR
 {
 	if (data.uv.x < 0 || data.uv.y < 0 || data.uv.x > 1 || data.uv.y > 1)
 		clip(-1);
@@ -43,8 +43,7 @@ float4 MainPS(ShaderData data, float2 scrPos : VPOS) : COLOR
 	
     float4 texcol = tex2D(LevelTex, data.uv + distortion);
 
-	float plrLightDst = clamp(distance(float2(0,0),  float2((scrPos.x - clr.x)*(_screenSize.x/_screenSize.y), scrPos.y - clr.y))*lerp(21, 8, clr.z), 0, 1);
-
+    float plrLightDst = clamp(distance(float2(0, 0), float2((data.uv.x - clr.x) * (_screenSize.x / _screenSize.y), data.uv.y - clr.y)) * lerp(21, 8, clr.z), 0, 1);
 
 	int red = texcol.x * 255;
 
@@ -55,7 +54,7 @@ float4 MainPS(ShaderData data, float2 scrPos : VPOS) : COLOR
 	if(texcol.x == 1.0 && texcol.y == 1.0 && texcol.z == 1.0)
 		grad = 1;
  
-	float4 grabColor = tex2D(GrabTexture, float2(scrPos.x+distortion.x, 1.0-scrPos.y-distortion.y));
+    float4 grabColor = SampleGrab(float2(data.uv.x + distortion.x, data.uv.y - distortion.y));
 
 	if (grabColor.x == 0.0 && grabColor.y == 2.0/255.0 && grabColor.z == 0.0)
 		grad = 1;
