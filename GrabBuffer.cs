@@ -23,6 +23,8 @@ namespace RainMap
         public static bool DrawnTo { get; private set; }
         public static Vector2 SourceScaleCorrection => CurrentSize / CurrentSource.Size.ToVector2();
 
+        static RenderTargetBinding[] PreviousTargets = null!;
+
         public static readonly GrabRenderer Renderer = new();
 
         public static void Clear()
@@ -46,6 +48,7 @@ namespace RainMap
                 Target?.Dispose();
                 Target = new(Main.Instance.GraphicsDevice, width, height);
             }
+            PreviousTargets = Main.Instance.GraphicsDevice.GetRenderTargets();
 
             Main.Instance.GraphicsDevice.SetRenderTarget(Target);
             Main.Instance.GraphicsDevice.Clear(Color.Transparent);
@@ -53,7 +56,7 @@ namespace RainMap
 
         public static void End()
         {
-            Main.Instance.GraphicsDevice.SetRenderTarget(null);
+            Main.Instance.GraphicsDevice.SetRenderTargets(PreviousTargets);
             DrawnTo = true;
         }
 

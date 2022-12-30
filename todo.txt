@@ -1,4 +1,3 @@
-_GrabTexture (framebuffer capturing)
 Placed objects
 Split rendering into layers
 GUI

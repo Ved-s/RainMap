@@ -358,13 +358,13 @@ namespace RainMap
 
             GrabBuffer.Begin(texture.Texture.Size(), scale, CameraPositions[index]);
 
-            Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
-            bool mouse = IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50));
+            //Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
+            //bool mouse = IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50));
 
             //if (mouse)
             //{
             //    Main.SpriteBatch.Begin(blendState: BlendState.AlphaBlend);
-            //    GrabBuffer.Renderer.DrawRect(mouseWorld - WorldPos - new Vector2(50), new(100), Color.Cyan);
+            //    GrabBuffer.Renderer.DrawRect(new Vector2(50), new(100), Color.Cyan);
             //    Main.SpriteBatch.End();
             //}
 
