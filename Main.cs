@@ -47,6 +47,7 @@ namespace RainMap
 
         public static bool RenderRoomLevel = true;
         public static bool RenderRoomTiles = false;
+        public static bool UseParallax = false;
 
         static Stopwatch DrawTimeWatch = new();
         static int FPS;
@@ -196,6 +197,9 @@ namespace RainMap
             if (IsActive)
             {
                 WorldCamera.Update();
+
+                if (KeyboardState.IsKeyDown(Keys.F4) && OldKeyboardState.IsKeyUp(Keys.F4))
+                    UseParallax = !UseParallax;
 
                 if (KeyboardState.IsKeyDown(Keys.F5) && OldKeyboardState.IsKeyUp(Keys.F5))
                 {

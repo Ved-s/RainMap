@@ -1,7 +1,9 @@
-#include "GrabShader.fx"
+#define LEVELREG s2
+
+#include "Includes/GrabShader.fx"
+#include "Includes/LevelShader.fx"
 
 sampler2D MainTex : register(s0);
-sampler2D LevelTex;
 
 float4x4 Projection;
 
@@ -23,7 +25,7 @@ float4 MainPS(ShaderData data) : COLOR
     if (data.leveluv.x < 0 || data.leveluv.y < 0 || data.leveluv.x > 1 || data.leveluv.y > 1)
         clip(-1);
 
-    float4 texcol = tex2D(LevelTex, data.leveluv);
+    float4 texcol = SampleLevelParallax(data.leveluv);
 
     int red = texcol.x * 255;
 
@@ -45,13 +47,13 @@ float4 MainPS(ShaderData data) : COLOR
 
     float2 oldShadowPos = data.leveluv - (dir * pow(centerDist, 1.25) * pow(dist, 1.5) * 0.3);
 
-    texcol = tex2D(LevelTex, shadowPos);
+    texcol = SampleLevelParallax(shadowPos);
     red = texcol.x * 255 - 1;
     float shadowDist = (red % 30.0)/30.0;
     if(texcol.x == 1.0 && texcol.y == 1.0 && texcol.z == 1.0) 
         shadowDist = 1.0;
 
-    texcol = tex2D(LevelTex, highLightPos);
+    texcol = SampleLevelParallax(highLightPos);
     red = texcol.x * 255 - 1;
     float highLightDist = (red % 30.0)/30.0;
     if(texcol.x == 1.0 && texcol.y == 1.0 && texcol.z == 1.0) 
@@ -81,7 +83,7 @@ float4 MainPS(ShaderData data) : COLOR
     if(paletteColor == 0)
     {
         float2 sd2Pos = data.leveluv - (dir * 0.01 * centerDist);
-        red = tex2D(LevelTex, sd2Pos).x * 255;
+        red = SampleLevelParallax(sd2Pos).x * 255;
         float sd2 = (red % 30.0)/30.0;
         if(sd2 < dist && sd2 > dist - 0.1) 
             shadow = lerp(shadow, 1, pow(centerDist*2.0, 2.5-4.0*centerDist));

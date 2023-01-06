@@ -32,7 +32,6 @@ namespace RainMap
             CaptureRenderer renderer = new(image)
             {
                 Position = min,
-                Size = max - min
             };
 
             for (int k = 0; k < region.Rooms.Count; k++)
@@ -57,6 +56,8 @@ namespace RainMap
                     TextureAsset? screen = room.CameraScreens[i];
                     if (screen is not null)
                     {
+                        renderer.Size = room.ScreenSize;
+
                         renderer.BeginCapture(screen.Texture.Width, screen.Texture.Height);
                         renderer.Position = room.WorldPos + room.CameraPositions[i];
                         room.DrawScreen(renderer, i);

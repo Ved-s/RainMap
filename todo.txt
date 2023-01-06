@@ -1,5 +1,5 @@
-Placed objects
 Split rendering into layers
+Placed objects
 GUI
 Waterfalls
 Room effects

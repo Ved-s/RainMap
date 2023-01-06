@@ -1,7 +1,7 @@
-#include "PaletteShader.fx"
-#include "GrabShader.fx"
+#include "Includes/PaletteShader.fx"
+#include "Includes/GrabShader.fx"
+#include "Includes/LevelShader.fx"
 
-sampler2D LevelTex : register(s0);
 sampler2D NoiseTex;
 
 float _RAIN;
@@ -41,7 +41,7 @@ float4 MainPS(ShaderData data) : COLOR
 	distortion.x = floor(distortion.x*_screenSize.x)/_screenSize.x;
 	distortion.y = floor(distortion.y*_screenSize.y)/_screenSize.y;
 	
-    float4 texcol = tex2D(LevelTex, data.uv + distortion);
+    float4 texcol = SampleLevelParallax(data.uv + distortion);
 
     float plrLightDst = clamp(distance(float2(0, 0), float2((data.uv.x - clr.x) * (_screenSize.x / _screenSize.y), data.uv.y - clr.y)) * lerp(21, 8, clr.z), 0, 1);
 
@@ -78,9 +78,10 @@ float4 MainPS(ShaderData data) : COLOR
 	else
 		grabColor = float4(0,0,0,1);
 
-	red = tex2D(LevelTex, data.uv).x*255;
+	red = SampleLevelParallax(data.uv).x*255;
 
-	if(red % 30.0 < _waterDepth * 31.0) return float4(0, 0, 0, 0);
+	if(red % 30.0 < _waterDepth * 31.0) 
+		return float4(0, 0, 0, 0);
 	
     grad = pow(grad, clamp(1 - pow(data.depth, 10), 0.5, 1)) * data.depth;
 	

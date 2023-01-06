@@ -1,7 +1,6 @@
-﻿#include "PaletteShader.fx"
-#include "GrabShader.fx"
-
-sampler2D LevelTex : register(s0);
+﻿#include "Includes/PaletteShader.fx"
+#include "Includes/GrabShader.fx"
+#include "Includes/LevelShader.fx"
 
 float4x4 Projection;
 float _waterDepth;
@@ -23,7 +22,7 @@ float4 MainPS(ShaderData data) : COLOR
     if (data.uv.x < 0 || data.uv.y < 0 || data.uv.x > 1 || data.uv.y > 1)
         clip(-1);
     
-    float4 texcol = tex2D(LevelTex, data.uv);
+    float4 texcol = SampleLevelParallax(data.uv);
     
     int ired = texcol.x * 255;
     float red = ired % 30;

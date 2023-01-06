@@ -2,11 +2,15 @@
 using Microsoft.Xna.Framework.Graphics;
 using RainMap.Renderers;
 using RainMap.Structures;
+using SixLabors.Fonts;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace RainMap
@@ -351,28 +355,28 @@ namespace RainMap
             if (texture is null)
                 return;
 
-            GrabBuffer.Clear();
-
+            //GrabBuffer.Clear();
+            //
             float scale = Math.Min(1, renderer.Scale);
             float scale2 = Math.Max(1, renderer.Scale);
-
-            GrabBuffer.Begin(texture.Texture.Size(), scale, CameraPositions[index]);
-
-            //Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
-            //bool mouse = IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50));
-
-            //if (mouse)
-            //{
-            //    Main.SpriteBatch.Begin(blendState: BlendState.AlphaBlend);
-            //    GrabBuffer.Renderer.DrawRect(new Vector2(50), new(100), Color.Cyan);
-            //    Main.SpriteBatch.End();
-            //}
-
-            GrabBuffer.End();
+            //
+            //GrabBuffer.Begin(texture.Texture.Size(), scale, CameraPositions[index]);
+            //
+            ////Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
+            ////bool mouse = IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50));
+            ////
+            ////if (mouse)
+            ////{
+            ////    Main.SpriteBatch.Begin(blendState: BlendState.AlphaBlend);
+            ////    GrabBuffer.Renderer.DrawRect(mouseWorld- WorldPos - new Vector2(50), new(100), Color.White);
+            ////    Main.SpriteBatch.End();
+            ////}
+            //
+            //GrabBuffer.End();
             
-            Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
-            renderer.DrawTexture(GrabBuffer.Target!, CameraPositions[index] + WorldPos, GrabBuffer.CurrentSource, texture.Texture.Size(), Color.White, Vector2.One * scale2);
-            Main.SpriteBatch.End();
+            //Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            //renderer.DrawTexture(GrabBuffer.Target!, CameraPositions[index] + WorldPos, GrabBuffer.CurrentSource, texture.Texture.Size(), Color.White, Vector2.One * scale2);
+            //Main.SpriteBatch.End();
 
             if (Main.RenderRoomLevel)
             {
@@ -382,7 +386,8 @@ namespace RainMap
                 {
                     Main.RoomColor.Parameters["Projection"]?.SetValue(renderer.Projection);
                     ApplyPaletteToShader(Main.RoomColor, index);
-                    GrabBuffer.ApplyToShader(Main.RoomColor);
+                    ApplyLevelToShader(Main.RoomColor, index, renderer);
+                    //GrabBuffer.ApplyToShader(Main.RoomColor);
 
                     if (Settings?.EffectColorA is not null)
                         Main.RoomColor.Parameters["EffectColorA"]?.SetValue(Settings.EffectColorA.Value);
@@ -487,6 +492,26 @@ namespace RainMap
             });
 
         }
+        public void ApplyLevelToShader(Effect effect, int screenIndex, Renderer renderer)
+        {
+            if (Main.UseParallax)
+            {
+                Vector2 worldScreenCenter = renderer is CaptureRenderer
+                ? renderer.Size / 2 + WorldPos + CameraPositions[screenIndex]
+                : renderer.InverseTransformVector(renderer.Size / 2);
+                Vector2 parallax = (worldScreenCenter - (WorldPos + CameraPositions[screenIndex])) / (CameraScreens[screenIndex]?.Texture.Size() ?? Vector2.One);
+
+                effect.Parameters["ParallaxDistance"]?.SetValue(10 / renderer.Size.X);
+                effect.Parameters["ParallaxCenter"]?.SetValue(parallax);
+            }
+            else 
+            {
+                effect.Parameters["ParallaxDistance"]?.SetValue(0);
+            }
+
+            if (CameraScreens[screenIndex] is not null)
+                effect.Parameters["LevelTex"]?.SetValue(CameraScreens[screenIndex]!.Texture);
+        }
 
         void UpdateWater()
         {
@@ -572,6 +597,9 @@ namespace RainMap
             //if (renderer != Main.WorldCamera)
             //    Debugger.Break();
 
+            Vector2 parallaxCenter = renderer.InverseTransformVector(renderer.Size / 2) - WorldPos;
+            float parallaxDistance = 10 / renderer.Size.X;
+
             Vector2 screenpos = CameraPositions[screenIndex];
 
             Matrix roomMatrix = Matrix.CreateTranslation(new(WorldPos, 0));
@@ -632,7 +660,16 @@ namespace RainMap
                 far.Y = Size.Y * 20 - (WaterHeight + farPos);
                 far.X = j * WaterData.TriangleSize + ScreenStart.X;
 
-                far = ApplyDepthOnVector(far, ScreenSize * new Vector2(.5f, 0.5f), 30);
+                if (Main.UseParallax)
+                {
+                    Vector2 parallaxDir = parallaxCenter - far;
+                    parallaxDir *= parallaxDistance;
+                    far += parallaxDir * 30;
+                }
+                else 
+                {
+                    far = ApplyDepthOnVector(far, ScreenSize * new Vector2(.5f, 0.5f), 30);
+                }
 
                 if (far.Y > close.Y)
                     far.Y = close.Y;
@@ -657,11 +694,11 @@ namespace RainMap
             if (vertexIndex > 3)
             {
                 ApplyPaletteToShader(Main.WaterSurface, screenIndex);
-                GrabBuffer.ApplyToShader(Main.WaterSurface);
-                Main.WaterSurface.Parameters["LevelTex"].SetValue(CameraScreens[screenIndex]!.Texture);
+                ApplyLevelToShader(Main.WaterSurface, screenIndex, renderer);
+                //GrabBuffer.ApplyToShader(Main.WaterSurface);
                 Main.WaterSurface.Parameters["Projection"].SetValue(roomMatrix);
                 Main.WaterSurface.Parameters["_waterDepth"].SetValue(WaterInFrontOfTerrain ? 0 : 1f / 30);
-
+            
                 Main.Instance.GraphicsDevice.SamplerStates[0] = SamplerState.PointClamp;
                 Main.WaterSurface.CurrentTechnique.Passes[0].Apply();
                 Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, Water.Vertices, 0, vertexIndex - 2);
@@ -712,24 +749,23 @@ namespace RainMap
             if (vertexIndex > 3)
             {
                 ApplyPaletteToShader(Main.WaterColor, screenIndex);
-                GrabBuffer.ApplyToShader(Main.WaterColor);
-
-                Main.WaterColor.Parameters["LevelTex"].SetValue(CameraScreens[screenIndex]!.Texture);
+                ApplyLevelToShader(Main.WaterColor, screenIndex, renderer);
+                //GrabBuffer.ApplyToShader(Main.WaterColor);
+            
                 Main.WaterColor.Parameters["Projection"].SetValue(roomMatrix);
-
+            
                 //Vector2 spriteSize = screensize * PanNZoom.Zoom;
-
+            
                 // For some reason, on-screen sprite position is flipped in shader here if not capturing
                 //if (!forCapture)
                 //    spriteSize *= new Vector2(1, -1);
-
+            
                 Main.WaterColor.Parameters["_screenOff"].SetValue(CameraPositions[screenIndex] / (Main.Noise?.Bounds.Size.ToVector2() ?? Vector2.One));
                 Main.WaterColor.Parameters["_screenSize"].SetValue(screensize);
                 Main.WaterColor.Parameters["_waterDepth"].SetValue(WaterInFrontOfTerrain ? 0 : 1f / 30);
-
+            
                 Main.WaterColor.CurrentTechnique.Passes[0].Apply();
 
-                Main.Instance.GraphicsDevice.SamplerStates[0] = SamplerState.PointClamp;
                 Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, Water.Vertices, 0, vertexIndex - 2);
             }
         }
@@ -1017,8 +1053,8 @@ namespace RainMap
 
             public void UpdateRoomSizes(float roomWidth, float maxScreenWidth)
             {
-                Surface = new SurfacePoint[(int)(roomWidth / TriangleSize + 2), 2];
-                Vertices = new WaterVertex[(int)(maxScreenWidth / TriangleSize + 4) * 2];
+                Surface = new SurfacePoint[(int)(roomWidth / TriangleSize + 10), 2];
+                Vertices = new WaterVertex[(int)(maxScreenWidth / TriangleSize + 20) * 2];
 
                 for (int i = 0; i < Surface.GetLength(0); i++)
                 {

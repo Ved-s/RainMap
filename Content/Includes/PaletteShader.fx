@@ -15,12 +15,12 @@ float remap(float iMin, float iMax, float oMin, float oMax, float v)
 
 float2 getFadePos(int index)
 {
-    return tex2D(FadePosValTex, float2((index + .5) / FadeSize, .5)).xy;
+    return tex2Dlod(FadePosValTex, float4((index + .5) / FadeSize, .5, 0, 0)).xy;
 }
 
 float getFadeVal(int index)
 {
-    return tex2D(FadePosValTex, float2((index + .5) / FadeSize, .5)).z;
+    return tex2Dlod(FadePosValTex, float4((index + .5) / FadeSize, .5, 0, 0)).z;
 }
 
 float fadeGradient(float2 uv)
@@ -140,6 +140,6 @@ float4 SamplePalette(float x, float y, float fade)
     x /= 32.0;
     y /= 8.0;
 
-    float2 pos = float2(x, (1 - y) / 2);
-    return lerp(tex2D(PaletteTex, pos), tex2D(FadePaletteTex, pos), fade);
+    float4 pos = float4(x, (1 - y) / 2, 0, 0);
+    return lerp(tex2Dlod(PaletteTex, pos), tex2Dlod(FadePaletteTex, pos), fade);
 }

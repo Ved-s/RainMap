@@ -1,7 +1,7 @@
-﻿#include "PaletteShader.fx"
-#include "GrabShader.fx"
+#include "Includes/PaletteShader.fx"
+#include "Includes/GrabShader.fx"
+#include "Includes/LevelShader.fx"
 
-sampler2D LevelTex : register(s0);
 sampler2D NoiseTex;
 sampler2D EffectColors;
 
@@ -34,19 +34,20 @@ void MainVS(inout ShaderData data)
 float4 MainPS(ShaderData i) : COLOR
 {
     float fade = CacheFade(i.uv);
+    float2 lod = 0;
     
     //float rand = frac(sin(dot(i.uv.x, 12.98232)+_RAIN-i.uv.y) * 43758.5453);
     float4 setColor = float4(0.0, 0.0, 0.0, 1.0);
     bool checkMaskOut = false;
 
-    float ugh = fmod(fmod(tex2D(LevelTex, float2(i.uv.x, i.uv.y)).x * 255, 90) - 1, 30) / 300.0;
-    float displace = tex2D(NoiseTex, float2((i.uv.x * 1.5) - ugh + (_RAIN * 0.01), (i.uv.y * 0.25) - ugh + _RAIN * 0.05)).x;
+    float ugh = fmod(fmod(SampleLevel(float2(i.uv.x, i.uv.y)).x * 255, 90) - 1, 30) / 300.0;
+    float displace = tex2Dlod(NoiseTex, float4((i.uv.x * 1.5) - ugh + (_RAIN * 0.01), (i.uv.y * 0.25) - ugh + _RAIN * 0.05, lod)).x;
     displace = clamp((sin((displace + i.uv.x + i.uv.y + _RAIN * 0.1) * 3 * 3.14) - 0.95) * 20, 0, 1);
 
     if (_WetTerrain < 0.5 || i.uv.y > _waterLevel) 
         displace = 0;
 
-    float4 texcol = tex2D(LevelTex, float2(i.uv.x, i.uv.y + displace * 0.001));
+    float4 texcol = SampleLevelParallax(float2(i.uv.x, i.uv.y + displace * 0.001));
 
     //if(texcol.y * 255 > 7 && texcol.y * 255 < 11) return float4(0,0,1,1);
     if (texcol.x == 1.0 && texcol.y == 1.0 && texcol.z == 1.0)
@@ -108,7 +109,7 @@ float4 MainPS(ShaderData i) : COLOR
 
         if (effectCol == 100)
         {
-            float4 decalCol = tex2D(LevelTex, float2((255.5 - texcol.z * 255.0) / 1400.0, 1 - 799.5 / 800.0));
+            float4 decalCol = SampleLevel(float2((255.5 - texcol.z * 255.0) / 1400.0, 1 - 799.5 / 800.0));
             if (paletteColor == 2) 
                 decalCol = lerp(decalCol, float4(1, 1, 1, 1), 0.2 - shadow * 0.1);
 
