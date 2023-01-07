@@ -76,6 +76,7 @@ namespace RainMap
             base.Initialize();
             FPSWatcher.Start();
             GraphicsDevice.PresentationParameters.RenderTargetUsage = RenderTargetUsage.PreserveContents;
+            PlacedObjects.PlacedObject.RegisterAll();
         }
 
         protected override void LoadContent()

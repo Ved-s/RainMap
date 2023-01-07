@@ -1,4 +1,5 @@
-﻿using System;
+﻿using RainMap.PlacedObjects;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -40,6 +41,8 @@ namespace RainMap
         float? secondWaveLength;
         float? secondWaveAmplitude;
 
+        public List<PlacedObject> PlacedObjects = new();
+
         public static RoomSettings Load(string filePath, RoomSettings? parent = null)
         {
             RoomSettings settings = new();
@@ -73,11 +76,7 @@ namespace RainMap
                             settings.FadePalette = fadePalette;
                         settings.fadePaletteValues = new float[fp.Length - 1];
                         for (int j = 1; j < fp.Length; j++)
-                            if (float.TryParse(fp[j].Trim(),
-#if !MGBRIDGE
-                                NumberStyles.Float,
-#endif
-                                CultureInfo.InvariantCulture, out float fade))
+                            if (float.TryParse(fp[j].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float fade))
                                 settings.fadePaletteValues[j - 1] = fade;
                         
                         break;
@@ -90,62 +89,40 @@ namespace RainMap
                         settings.EffectColorB = effectColorB;
                         break;
 
-                    case "Grime" when float.TryParse(split[1],
-#if !MGBRIDGE
-                    NumberStyles.Float,
-#endif                    
-                    CultureInfo.InvariantCulture,out float grime):
+                    case "Grime" when float.TryParse(split[1], NumberStyles.Float, CultureInfo.InvariantCulture,out float grime):
                         settings.Grime = grime;
                         break;
 
-                    case "Clouds" when float.TryParse(split[1],
-#if !MGBRIDGE
-                    NumberStyles.Float,
-#endif                    
-                    CultureInfo.InvariantCulture, out float clouds):
+                    case "Clouds" when float.TryParse(split[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float clouds):
                         settings.Clouds = clouds;
                         break;
 
-                    case "WaveSpeed" when float.TryParse(split[1],
-#if !MGBRIDGE
-                    NumberStyles.Float,
-#endif                    
-                    CultureInfo.InvariantCulture, out float waveSpeed):
+                    case "WaveSpeed" when float.TryParse(split[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float waveSpeed):
                         settings.WaveSpeed = waveSpeed;
                         break;
 
-                    case "WaveLength" when float.TryParse(split[1],
-#if !MGBRIDGE
-                    NumberStyles.Float,
-#endif                    
-                    CultureInfo.InvariantCulture, out float waveLength):
+                    case "WaveLength" when float.TryParse(split[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float waveLength):
                         settings.WaveLength = waveLength;
                         break;
 
-                    case "WaveAmplitude" when float.TryParse(split[1],
-#if !MGBRIDGE
-                    NumberStyles.Float,
-#endif                    
-                    CultureInfo.InvariantCulture, out float waveAmplitude):
+                    case "WaveAmplitude" when float.TryParse(split[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float waveAmplitude):
                         settings.WaveAmplitude = waveAmplitude;
                         break;
 
-                    case "SecondWaveLength" when float.TryParse(split[1],
-#if !MGBRIDGE
-                    NumberStyles.Float,
-#endif                    
-                    CultureInfo.InvariantCulture, out float secondWaveSpeeed):
+                    case "SecondWaveLength" when float.TryParse(split[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float secondWaveSpeeed):
                         settings.SecondWaveLength = secondWaveSpeeed;
                         break;
 
-                    case "SecondWaveAmplitude" when float.TryParse(split[1],
-#if !MGBRIDGE
-                    NumberStyles.Float,
-#endif                    
-                    CultureInfo.InvariantCulture, out float secondWaveAmplitude):
+                    case "SecondWaveAmplitude" when float.TryParse(split[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float secondWaveAmplitude):
                         settings.SecondWaveAmplitude = secondWaveAmplitude;
                         break;
 
+                    case "PlacedObjects":
+                        settings.PlacedObjects.Clear();
+                        foreach (string podata in split[1].Split(',', StringSplitOptions.TrimEntries))
+                            if (PlacedObject.TryLoadObject(podata, out PlacedObject? po))
+                                settings.PlacedObjects.Add(po);
+                        break;
                 }
             }
 

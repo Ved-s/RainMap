@@ -1,17 +1,13 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using RainMap.PlacedObjects;
 using RainMap.Renderers;
 using RainMap.Structures;
-using SixLabors.Fonts;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 
 namespace RainMap
 {
@@ -320,6 +316,10 @@ namespace RainMap
                 DoneFullScreenUpdate = true;
             }
 
+            if (Settings is not null)
+                foreach (PlacedObject obj in Settings.PlacedObjects)
+                    obj.Update();
+
             UpdateWater();
         }
 
@@ -364,7 +364,7 @@ namespace RainMap
             //
             Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
             //bool mouse = IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50));
-            
+
             ////if (mouse)
             ////{
             ////    Main.SpriteBatch.Begin(blendState: BlendState.AlphaBlend);
@@ -373,7 +373,7 @@ namespace RainMap
             ////}
             //
             //GrabBuffer.End();
-            
+
             //Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
             //renderer.DrawTexture(GrabBuffer.Target!, CameraPositions[index] + WorldPos, GrabBuffer.CurrentSource, texture.Texture.Size(), Color.White, Vector2.One * scale2);
             //Main.SpriteBatch.End();
@@ -406,7 +406,7 @@ namespace RainMap
                 //float lrad = 12000;
                 //if (IntersectsWith(mouseWorld - new Vector2(lrad), mouseWorld + new Vector2(lrad)))
                 //    DrawLight(renderer, mouseWorld - WorldPos, lrad, Color.Black, index);
-
+                DrawObjectLights(renderer, index);
                 DrawWater(renderer, index);
             }
             DrawTileOverlay(renderer, index);
@@ -504,7 +504,7 @@ namespace RainMap
                 effect.Parameters["ParallaxDistance"]?.SetValue(10 / renderer.Size.X * renderer.Scale);
                 effect.Parameters["ParallaxCenter"]?.SetValue(parallax);
             }
-            else 
+            else
             {
                 effect.Parameters["ParallaxDistance"]?.SetValue(0);
             }
@@ -666,7 +666,7 @@ namespace RainMap
                     parallaxDir *= parallaxDistance;
                     far += parallaxDir * 30;
                 }
-                else 
+                else
                 {
                     far = ApplyDepthOnVector(far, ScreenSize * new Vector2(.5f, 0.5f), 30);
                 }
@@ -698,7 +698,7 @@ namespace RainMap
                 //GrabBuffer.ApplyToShader(Main.WaterSurface);
                 Main.WaterSurface.Parameters["Projection"].SetValue(roomMatrix);
                 Main.WaterSurface.Parameters["_waterDepth"].SetValue(WaterInFrontOfTerrain ? 0 : 1f / 30);
-            
+
                 Main.Instance.GraphicsDevice.SamplerStates[0] = SamplerState.PointClamp;
                 Main.WaterSurface.CurrentTechnique.Passes[0].Apply();
                 Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, Water.Vertices, 0, vertexIndex - 2);
@@ -751,19 +751,19 @@ namespace RainMap
                 ApplyPaletteToShader(Main.WaterColor, screenIndex);
                 ApplyLevelToShader(Main.WaterColor, screenIndex, renderer);
                 //GrabBuffer.ApplyToShader(Main.WaterColor);
-            
+
                 Main.WaterColor.Parameters["Projection"].SetValue(roomMatrix);
-            
+
                 //Vector2 spriteSize = screensize * PanNZoom.Zoom;
-            
+
                 // For some reason, on-screen sprite position is flipped in shader here if not capturing
                 //if (!forCapture)
                 //    spriteSize *= new Vector2(1, -1);
-            
+
                 Main.WaterColor.Parameters["_screenOff"].SetValue(CameraPositions[screenIndex] / (Main.Noise?.Bounds.Size.ToVector2() ?? Vector2.One));
                 Main.WaterColor.Parameters["_screenSize"].SetValue(screensize);
                 Main.WaterColor.Parameters["_waterDepth"].SetValue(WaterInFrontOfTerrain ? 0 : 1f / 30);
-            
+
                 Main.WaterColor.CurrentTechnique.Passes[0].Apply();
 
                 Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, Water.Vertices, 0, vertexIndex - 2);
@@ -923,10 +923,10 @@ namespace RainMap
                                     Color bottomColor = Color.Black * solidAlpha;
 
                                     TriangleDrawing.AddQuad(
-                                        new(left, top),      topColor,
-                                        new(right, top),     topColor,
-                                        new(left, bottom),   bottomColor,
-                                        new(right, bottom),  bottomColor);
+                                        new(left, top), topColor,
+                                        new(right, top), topColor,
+                                        new(left, bottom), bottomColor,
+                                        new(right, bottom), bottomColor);
 
                                     bottom = top + 0.05f;
                                     top -= 0.10f;
@@ -964,9 +964,32 @@ namespace RainMap
             Main.PixelEffect.VertexColorEnabled = true;
             TriangleDrawing.Draw(Main.PixelEffect);
         }
+        void DrawObjectLights(Renderer renderer, int screenIndex)
+        {
+            if (Settings is null)
+                return;
 
+            foreach (PlacedObject obj in Settings.PlacedObjects)
+                if (obj is ILightObject lightObj && lightObj.Lights is not null)
+                    foreach (ILightObject.LightData light in lightObj.Lights)
+                        if (light.Enabled)
+                        {
+                            Vector2 pos = light.RoomPos;
+                            float rad = light.Radius / 8;
+                            //pos += new Vector2(rad);
+                            pos.Y = Size.Y * 20 - pos.Y;
+                            DrawLight(renderer, pos, rad, light.Color, screenIndex);
+
+                            //Main.SpriteBatch.Begin();
+                            //renderer.DrawRect(pos + WorldPos - new Vector2(20), new(40), light.Color);
+                            //Main.SpriteBatch.End();
+
+                        }
+        }
         void DrawLight(Renderer renderer, Vector2 pos, float rad, Color color, int screen)
         {
+            Vector2 texSize = new(100);
+
             LightVertices[0].Position = pos + new Vector2(-rad, -rad);
             LightVertices[1].Position = pos + new Vector2(rad, -rad);
             LightVertices[2].Position = pos + new Vector2(-rad, rad);
@@ -999,7 +1022,7 @@ namespace RainMap
             Main.Instance.GraphicsDevice.BlendState = BlendState.AlphaBlend;
             Main.Instance.GraphicsDevice.SamplerStates[2] = SamplerState.PointClamp;
             Main.LightSource.CurrentTechnique.Passes[0].Apply();
-            
+
             Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, LightVertices, 0, 2);
         }
 

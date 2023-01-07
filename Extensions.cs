@@ -11,6 +11,11 @@ namespace RainMap
 {
     public static class Extensions
     {
+        public static void SetAlpha(ref this Color color, float alpha)
+        {
+            color.A = (byte)(Math.Clamp(alpha, 0, 1) * 255);
+        }
+
         public static bool TryGet<T>(this T[] array, int index, out T value)
         {
             if (index < array.Length)
