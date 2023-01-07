@@ -362,9 +362,9 @@ namespace RainMap
             //
             //GrabBuffer.Begin(texture.Texture.Size(), scale, CameraPositions[index]);
             //
-            ////Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
-            ////bool mouse = IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50));
-            ////
+            Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
+            //bool mouse = IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50));
+            
             ////if (mouse)
             ////{
             ////    Main.SpriteBatch.Begin(blendState: BlendState.AlphaBlend);
@@ -403,9 +403,9 @@ namespace RainMap
 
                 Main.SpriteBatch.End();
 
-                //
-                //if ()
-                //    DrawLight(renderer, mouseWorld - WorldPos, 400, Color.White, index);
+                //float lrad = 12000;
+                //if (IntersectsWith(mouseWorld - new Vector2(lrad), mouseWorld + new Vector2(lrad)))
+                //    DrawLight(renderer, mouseWorld - WorldPos, lrad, Color.Black, index);
 
                 DrawWater(renderer, index);
             }
@@ -501,7 +501,7 @@ namespace RainMap
                 : renderer.InverseTransformVector(renderer.Size / 2);
                 Vector2 parallax = (worldScreenCenter - (WorldPos + CameraPositions[screenIndex])) / (CameraScreens[screenIndex]?.Texture.Size() ?? Vector2.One);
 
-                effect.Parameters["ParallaxDistance"]?.SetValue(10 / renderer.Size.X);
+                effect.Parameters["ParallaxDistance"]?.SetValue(10 / renderer.Size.X * renderer.Scale);
                 effect.Parameters["ParallaxCenter"]?.SetValue(parallax);
             }
             else 
@@ -598,7 +598,7 @@ namespace RainMap
             //    Debugger.Break();
 
             Vector2 parallaxCenter = renderer.InverseTransformVector(renderer.Size / 2) - WorldPos;
-            float parallaxDistance = 10 / renderer.Size.X;
+            float parallaxDistance = 10 / renderer.Size.X * renderer.Scale;
 
             Vector2 screenpos = CameraPositions[screenIndex];
 
@@ -992,11 +992,12 @@ namespace RainMap
             matrix = Matrix.Multiply(matrix, renderer.Transform);
             matrix = Matrix.Multiply(matrix, renderer.Projection);
 
+            ApplyLevelToShader(Main.LightSource, screen, renderer);
+
             Main.LightSource.Parameters["MainTex"]?.SetValue(Main.Pixel);
-            Main.LightSource.Parameters["LevelTex"]?.SetValue(CameraScreens[screen]?.Texture ?? Main.Pixel);
             Main.LightSource.Parameters["Projection"]?.SetValue(matrix);
             Main.Instance.GraphicsDevice.BlendState = BlendState.AlphaBlend;
-            Main.Instance.GraphicsDevice.SamplerStates[1] = SamplerState.PointClamp;
+            Main.Instance.GraphicsDevice.SamplerStates[2] = SamplerState.PointClamp;
             Main.LightSource.CurrentTechnique.Passes[0].Apply();
             
             Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, LightVertices, 0, 2);
