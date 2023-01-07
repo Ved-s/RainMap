@@ -292,30 +292,19 @@ namespace RainMap
                 if (!tLastOff.HasValue)
                     tLastOff = tOff;
 
-                bool once = false;
+                alternator = !alternator;
+                float tNext = t + tFac * lenFac;
 
-                for (float len = 0; len < bezLength; len += lineLength)
+                if (alternator)
                 {
-                    if (t - tOff > 1 && once)
-                        break;
+                    // HACK: write better bezier code
+                    Vector2 lineA = Bezier.CalcCubicBezier0(a, b, c, d, MathHelper.Clamp(t + MathHelper.Lerp(tLastOff.Value, tOff, 0.75f), 0, 1));
+                    Vector2 lineB = Bezier.CalcCubicBezier0(a, b, c, d, MathHelper.Clamp(tNext + tOff, 0, 1));
 
-                    once = true;
-
-                    alternator = !alternator;
-                    float tNext = t + tFac * lenFac;
-
-                    if (alternator)
-                    {
-                        Vector2 lineA = Bezier.CalcCubicBezier0(a, b, c, d, MathHelper.Clamp(t + tLastOff.Value, 0, 1));
-                        Vector2 lineB = Bezier.CalcCubicBezier0(a, b, c, d, MathHelper.Clamp(tNext + tOff, 0, 1));
-
-                        renderer.DrawLine(lineA, lineB, Color.White, 2);
-                    }
-                    t = tNext;
-
-                    tLastOff = tOff;
-
+                    renderer.DrawLine(lineA, lineB, Color.White, 2);
                 }
+                t = tNext;
+                tLastOff = tOff;
             }
         }
     }
