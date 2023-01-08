@@ -15,6 +15,21 @@ struct ShaderData
     float4 color : COLOR0;
 };
 
+float4 BlurSample(float2 uv)
+{
+    //return tex2D(MainTex, uv);
+    
+    float2 fw = 0.005;
+    
+    float4 c = tex2D(MainTex, uv);
+    c += tex2D(MainTex, uv + float2(0, -fw.y));
+    c += tex2D(MainTex, uv + float2(fw.x, 0));
+    c += tex2D(MainTex, uv + float2(0, fw.y));
+    c += tex2D(MainTex, uv + float2(-fw.x, 0));
+    
+    return (c / 5) / 2 + 0.5;
+}
+
 void MainVS(inout ShaderData data)
 {
     data.pos = mul(data.pos, Projection);
@@ -110,7 +125,9 @@ float4 MainPS(ShaderData data) : COLOR
         highLight = 0;
     }
 
-    dist *= tex2D(MainTex, data.uv.xy).x;
+    float2 fw = fwidth(data.uv);
+    
+    dist *= BlurSample(data.uv).x;
 
     float alpha = clamp(dist * data.color.w * (0.65 + highLight * 0.35), 0, 1);
     return float4(data.color.xyz, 1) * alpha;

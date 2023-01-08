@@ -6,6 +6,7 @@ using RainMap.Structures;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
@@ -45,6 +46,7 @@ namespace RainMap
         Texture2D? FadePosValCache = null;
         Vector2[] FixedCameraPositions = null!;
         bool DoneFullScreenUpdate = false;
+        Stopwatch DrawWatch = new();
 
         static LightVertex[] LightVertices = new LightVertex[4]
         {
@@ -55,6 +57,8 @@ namespace RainMap
         };
 
         public string FilePath = null!;
+
+        public static Room CurrentRoom = null!;
 
         public static Room Load(string roomPath)
         {
@@ -310,6 +314,7 @@ namespace RainMap
         }
         public void Update()
         {
+            CurrentRoom = this;
             if (!DoneFullScreenUpdate && CameraScreens.All(s => s is null || s.Loaded))
             {
                 UpdateScreenSize();
@@ -325,10 +330,13 @@ namespace RainMap
 
         public void Draw(Renderer renderer)
         {
+            CurrentRoom = this;
             Rendered = false;
 
             if (!IntersectsWith(renderer.InverseTransformVector(Vector2.Zero), renderer.InverseTransformVector(renderer.Size)))
                 return;
+
+            DrawWatch.Restart();
 
             PrepareDraw();
 
@@ -339,7 +347,16 @@ namespace RainMap
             Vector2 nameSize = Main.Consolas10.MeasureString(Name);
             Vector2 namePos = renderer.TransformVector(WorldPos + ScreenStart + new Vector2(ScreenSize.X / 2, 0)) - new Vector2(nameSize.X / 2, 0);
             Main.SpriteBatch.DrawStringShaded(Main.Consolas10, Name, namePos, Color.Yellow);
+
+            //Vector2 dtPos = renderer.TransformVector(WorldPos + ScreenStart);
+            //if (dtPos.X < 0) dtPos.X = 0;
+            //if (dtPos.Y < 0) dtPos.Y = 0;
+            //
+            //
+            //Main.SpriteBatch.DrawStringShaded(Main.Consolas10, $"DT: {DrawWatch.Elapsed.TotalMilliseconds:0.00}ms", dtPos, Color.Yellow);
             Main.SpriteBatch.End();
+
+            DrawWatch.Stop();
 
             Rendered = true;
         }
@@ -350,6 +367,7 @@ namespace RainMap
         }
         public void DrawScreen(Renderer renderer, int index)
         {
+            CurrentRoom = this;
             TextureAsset? texture = CameraScreens[index];
 
             if (texture is null)
@@ -363,7 +381,7 @@ namespace RainMap
             //GrabBuffer.Begin(texture.Texture.Size(), scale, CameraPositions[index]);
             //
             Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
-            //bool mouse = IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50));
+            bool mouse = IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50));
 
             ////if (mouse)
             ////{
@@ -408,6 +426,14 @@ namespace RainMap
                 //    DrawLight(renderer, mouseWorld - WorldPos, lrad, Color.Black, index);
                 DrawObjectLights(renderer, index);
                 DrawWater(renderer, index);
+
+                //if (mouse && renderer.Scale > 0.5f)
+                //{
+                //    Main.SpriteBatch.Begin();
+                //    renderer.DrawRect(mouseWorld - new Vector2(5), new(10), PixelColorAtCoordinate(mouseWorld - WorldPos));
+                //    Main.SpriteBatch.End();
+                //
+                //}
             }
             DrawTileOverlay(renderer, index);
         }
@@ -976,20 +1002,18 @@ namespace RainMap
                         {
                             Vector2 pos = light.RoomPos;
                             float rad = light.Radius / 8;
-                            //pos += new Vector2(rad);
                             pos.Y = Size.Y * 20 - pos.Y;
-                            DrawLight(renderer, pos, rad, light.Color, screenIndex);
+                            DrawLight(renderer, light.Texture?.Texture, pos, rad, light.Color, screenIndex);
 
                             //Main.SpriteBatch.Begin();
-                            //renderer.DrawRect(pos + WorldPos - new Vector2(20), new(40), light.Color);
+                            ////renderer.DrawRect(pos + WorldPos - new Vector2(rad), new(rad * 2), light.Color * 0.1f);
+                            //renderer.DrawRect(pos + WorldPos - new Vector2(rad), new(rad * 2), null, light.Color);
+                            //renderer.DrawRect(pos + WorldPos - new Vector2(1), new(3), null, Color.White);
                             //Main.SpriteBatch.End();
-
                         }
         }
-        void DrawLight(Renderer renderer, Vector2 pos, float rad, Color color, int screen)
+        void DrawLight(Renderer renderer, Texture2D? texture, Vector2 pos, float rad, Color color, int screen)
         {
-            Vector2 texSize = new(100);
-
             LightVertices[0].Position = pos + new Vector2(-rad, -rad);
             LightVertices[1].Position = pos + new Vector2(rad, -rad);
             LightVertices[2].Position = pos + new Vector2(-rad, rad);
@@ -1006,6 +1030,9 @@ namespace RainMap
             Vector2 topLeftUV = (screenPos - new Vector2(rad)) / screenSize;
             Vector2 bottomRightUV = (screenPos + new Vector2(rad)) / screenSize;
 
+            if (topLeftUV.X > 1 || topLeftUV.Y > 1 || bottomRightUV.X < 0 || bottomRightUV.Y < 0)
+                return;
+
             LightVertices[0].LevelTextureCoord = topLeftUV;
             LightVertices[1].LevelTextureCoord = new(bottomRightUV.X, topLeftUV.Y);
             LightVertices[2].LevelTextureCoord = new(topLeftUV.X, bottomRightUV.Y);
@@ -1017,9 +1044,10 @@ namespace RainMap
 
             ApplyLevelToShader(Main.LightSource, screen, renderer);
 
-            Main.LightSource.Parameters["MainTex"]?.SetValue(Main.Pixel);
+            Main.LightSource.Parameters["MainTex"]?.SetValue(texture ?? Main.Pixel);
             Main.LightSource.Parameters["Projection"]?.SetValue(matrix);
             Main.Instance.GraphicsDevice.BlendState = BlendState.AlphaBlend;
+            Main.Instance.GraphicsDevice.SamplerStates[0] = SamplerState.LinearClamp;
             Main.Instance.GraphicsDevice.SamplerStates[2] = SamplerState.PointClamp;
             Main.LightSource.CurrentTechnique.Passes[0].Apply();
 
@@ -1044,6 +1072,75 @@ namespace RainMap
                 FixedCameraPositions[i] = vec;
             }
 
+        }
+
+        public Color PixelColorAtCoordinate(Vector2 coord)
+        {
+            Texture2D? texture = null;
+            Vector2 texturePos = default;
+            int screenId = 0;
+
+            for (int i = 0; i < CameraScreens.Length; i++)
+            {
+                TextureAsset? screen = CameraScreens[i];
+                if (screen is not null)
+                {
+                    Point pos = CameraPositions[i].ToPoint();
+                    Point size = new(screen.Texture.Width, screen.Texture.Height);
+                    Rectangle rect = new(pos, size);
+                    if (rect.Contains(coord.ToPoint()))
+                    {
+                        texture = screen.Texture;
+                        texturePos = CameraPositions[i];
+                        screenId = i;
+                        break;
+                    }
+                }
+            }
+
+            if (texture is null)
+                return Color.Transparent;
+
+            coord -= texturePos;
+
+            Color pixel = texture.GetPixel((int)coord.X, (int)coord.Y);
+
+            if (pixel.R == 255 && pixel.G == 255 && pixel.B == 255)
+            {
+                return SamplePalette(0, 7, screenId);
+            }
+            int red = pixel.R;
+            float t = 0f;
+            if (red > 90)
+            {
+                red -= 90;
+            }
+            else
+            {
+                t = 1f;
+            }
+            int paletteColor = red / 30;
+            red = (red - 1) % 30;
+            Color a = Color.Lerp(SamplePalette(red, paletteColor + 3, screenId), SamplePalette(red, paletteColor, screenId), t);
+            return Color.Lerp(a, SamplePalette(1, 7, screenId), red * (1 - SamplePalette(9, 7, screenId).R / 255f) / 30f);
+        }
+
+        public Color SamplePalette(int x, int y, int screen)
+        {
+            Texture2D? palette = Palettes.GetPalette(Settings?.Palette ?? 0);
+            Texture2D? fadePalette = Palettes.GetPalette(Settings?.FadePalette ?? 0);
+
+            if (palette is null)
+                return Color.Transparent;
+
+            y = 7 - y;
+
+            float fade = Settings?.FadePaletteValues?[screen] ?? 0;
+
+            if (fadePalette is null || fade == 0)
+                return palette.GetPixel(x, y);
+
+            return Color.Lerp(palette.GetPixel(x, y), fadePalette.GetPixel(x, y), fade);
         }
 
         // I have no idea what that does

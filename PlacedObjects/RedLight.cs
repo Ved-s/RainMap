@@ -46,7 +46,7 @@ namespace RainMap.PlacedObjects
 
             Lights = new[]
             {
-                new LightData(Color.Red)
+                new LightData(Color.Red, GameAssets.LightMask0)
             };
         }
 

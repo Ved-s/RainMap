@@ -1,5 +1,6 @@
-Split rendering into layers
 Placed objects
+Flat lights
+Split rendering into layers
 GUI
 Waterfalls
 Room effects

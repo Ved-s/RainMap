@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,12 +17,14 @@ namespace RainMap.PlacedObjects
             public Vector2 RoomPos;
             public float Radius;
             public Color Color;
+            public TextureAsset? Texture;
             public bool Enabled = true;
 
             public LightData() { }
-            public LightData(Color color) 
+            public LightData(Color color, TextureAsset? texture = null) 
             {
                 Color = color;
+                Texture = texture;
             }
         }
     }
