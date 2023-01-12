@@ -46,6 +46,7 @@ namespace RainMap
 
         public static CameraRenderer WorldCamera = null!;
 
+        public static bool RenderConnections = true;
         public static bool RenderRoomLevel = true;
         public static bool RenderRoomTiles = false;
         public static bool DrawTime = false;
@@ -204,6 +205,9 @@ namespace RainMap
             if (IsActive)
             {
                 WorldCamera.Update();
+
+                if (KeyboardState.IsKeyDown(Keys.F3) && OldKeyboardState.IsKeyUp(Keys.F3))
+                    RenderConnections = !RenderConnections;
 
                 if (KeyboardState.IsKeyDown(Keys.F4) && OldKeyboardState.IsKeyUp(Keys.F4))
                     UseParallax = !UseParallax;
@@ -366,7 +370,7 @@ namespace RainMap
                 SpriteBatch.End();
             }
 
-            base.Draw(gameTime);
+            //base.Draw(gameTime);
         }
 
         protected override void EndDraw()

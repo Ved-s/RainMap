@@ -222,6 +222,9 @@ namespace RainMap
 
         public void DrawConnections(Renderer renderer)
         {
+            if (!Main.RenderConnections)
+                return;
+
             DrawnRoomConnections.Clear();
 
             Main.SpriteBatch.Begin();
