@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using RainMap.Renderers;
+using RainMap.Structures;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -47,12 +48,14 @@ namespace RainMap
 
         public static bool RenderRoomLevel = true;
         public static bool RenderRoomTiles = false;
+        public static bool DrawTime = false;
         public static bool UseParallax = false;
 
         public static string RainWorldDir = null!;
 
-        static Stopwatch DrawTimeWatch = new();
-        static Stopwatch PresentTimeWatch = new();
+        public static TimeLogger<MainDrawTime> MainTimeLogger = new(); 
+        public static TimeLogger<RoomDrawTime> RoomTimeLogger = new(); 
+
         static int FPS;
         static int FPSCounter;
         static Stopwatch FPSWatcher = new();
@@ -222,13 +225,14 @@ namespace RainMap
                 if (KeyboardState.IsKeyDown(Keys.F7) && OldKeyboardState.IsKeyUp(Keys.F7))
                     foreach (Room room in SelectedRooms)
                         room.UpdateScreenSize();
+
+                if (KeyboardState.IsKeyDown(Keys.F9) && OldKeyboardState.IsKeyUp(Keys.F9))
+                    DrawTime = !DrawTime;
             }
 
             if (Region is not null)
             {
                 Window.Title = $"RainMap " +
-                    $"DT: {DrawTimeWatch.Elapsed.TotalMilliseconds.ToString("0.00", CultureInfo.InvariantCulture)}ms " +
-                    $"PT: {PresentTimeWatch.Elapsed.TotalMilliseconds.ToString("0.00", CultureInfo.InvariantCulture)}ms " +
                     $"FPS: {FPS}" +
                     $"{(TextureLoader.QueueLength == 0 ? "" : $" Loading {TextureLoader.QueueLength} textures")}";
             }
@@ -236,7 +240,6 @@ namespace RainMap
 
         protected override void Draw(GameTime gameTime)
         {
-            DrawTimeWatch.Restart();
             Viewport vp = GraphicsDevice.Viewport;
             Projection = Matrix.CreateOrthographicOffCenter(0, vp.Width, vp.Height, 0, 0, 1);
 
@@ -305,9 +308,11 @@ namespace RainMap
 
             SpriteBatch.End();
 
-            
+            MainTimeLogger.StartWatch(MainDrawTime.Region);
+
             Region?.Draw(WorldCamera);
-            
+
+            MainTimeLogger.StartWatch(MainDrawTime.Selection);
 
             if (SelectedRooms.Count == 1)
             {
@@ -333,15 +338,41 @@ namespace RainMap
                 SpriteBatch.End();
             }
 
-            DrawTimeWatch.Stop();
+            if (DrawTime)
+            {
+                float x = 10;
+                float y = 10;
+
+                SpriteBatch.Begin();
+                SpriteBatch.DrawStringShaded(Consolas10, $"Main rendering time", new(x, y), Color.White);
+                y += Consolas10.LineSpacing;
+
+                foreach (var kvp in MainTimeLogger.Times)
+                {
+                    SpriteBatch.DrawStringShaded(Consolas10, $"{kvp.Key}: {kvp.Value.TotalMilliseconds:0.00}ms", new(x, y), Color.White);
+                    y += Consolas10.LineSpacing;
+                }
+
+                y += Consolas10.LineSpacing;
+                SpriteBatch.DrawStringShaded(Consolas10, $"Room rendering times", new(x, y), Color.White);
+                y += Consolas10.LineSpacing;
+                
+                foreach (var kvp in RoomTimeLogger.Times)
+                {
+                    SpriteBatch.DrawStringShaded(Consolas10, $"{kvp.Key}: {kvp.Value.TotalMilliseconds:0.00}ms", new(x, y), Color.White);
+                    y += Consolas10.LineSpacing;
+                }
+
+                SpriteBatch.End();
+            }
+
             base.Draw(gameTime);
         }
 
         protected override void EndDraw()
         {
-            PresentTimeWatch.Restart();
+            MainTimeLogger.StartWatch(MainDrawTime.Present);
             base.EndDraw();
-            PresentTimeWatch.Stop();
 
             FPSCounter++;
             if (FPSWatcher.Elapsed.TotalSeconds > 1)
@@ -350,6 +381,8 @@ namespace RainMap
                 FPS = FPSCounter;
                 FPSCounter = 0;
             }
+
+            MainTimeLogger.FinishWatch();
         }
 
         protected override void OnExiting(object sender, EventArgs args)

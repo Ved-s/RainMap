@@ -1,6 +1,11 @@
+Show names of unresolved placed objects
+Cache tile layer triangles
+Remove region class, move rooms to global place
+Load multiple regions
 Placed objects
 Flat lights
-Split rendering into layers
 GUI
+Render steps time display
+Split rendering into layers
 Waterfalls
 Room effects

@@ -46,7 +46,6 @@ namespace RainMap
         Texture2D? FadePosValCache = null;
         Vector2[] FixedCameraPositions = null!;
         bool DoneFullScreenUpdate = false;
-        Stopwatch DrawWatch = new();
 
         static LightVertex[] LightVertices = new LightVertex[4]
         {
@@ -336,8 +335,6 @@ namespace RainMap
             if (!IntersectsWith(renderer.InverseTransformVector(Vector2.Zero), renderer.InverseTransformVector(renderer.Size)))
                 return;
 
-            DrawWatch.Restart();
-
             PrepareDraw();
 
             for (int i = 0; i < CameraScreens.Length; i++)
@@ -355,8 +352,6 @@ namespace RainMap
             //
             //Main.SpriteBatch.DrawStringShaded(Main.Consolas10, $"DT: {DrawWatch.Elapsed.TotalMilliseconds:0.00}ms", dtPos, Color.Yellow);
             Main.SpriteBatch.End();
-
-            DrawWatch.Stop();
 
             Rendered = true;
         }
@@ -398,6 +393,8 @@ namespace RainMap
 
             if (Main.RenderRoomLevel)
             {
+                Main.RoomTimeLogger.StartWatch(RoomDrawTime.RoomLevel, true);
+
                 Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
 
                 if (Main.RoomColor is not null)
@@ -424,7 +421,9 @@ namespace RainMap
                 //float lrad = 12000;
                 //if (IntersectsWith(mouseWorld - new Vector2(lrad), mouseWorld + new Vector2(lrad)))
                 //    DrawLight(renderer, mouseWorld - WorldPos, lrad, Color.Black, index);
+                Main.RoomTimeLogger.StartWatch(RoomDrawTime.ObjectLights, true);
                 DrawObjectLights(renderer, index);
+                Main.RoomTimeLogger.StartWatch(RoomDrawTime.Water, true);
                 DrawWater(renderer, index);
 
                 //if (mouse && renderer.Scale > 0.5f)
@@ -435,7 +434,9 @@ namespace RainMap
                 //
                 //}
             }
+            Main.RoomTimeLogger.StartWatch(RoomDrawTime.Tiles, true);
             DrawTileOverlay(renderer, index);
+            Main.RoomTimeLogger.FinishWatch();
         }
         public void UpdateScreenSize()
         {

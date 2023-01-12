@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using RainMap.Renderers;
+using RainMap.Structures;
 using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.Processing;
 using System;
@@ -203,10 +204,14 @@ namespace RainMap
 
         public void Draw(Renderer renderer)
         {
+            Main.RoomTimeLogger.ResetWatches();
+
             foreach (Room room in Rooms)
                 room.Draw(renderer);
-
-            DrawConnections(renderer);   
+            
+            Main.RoomTimeLogger.StartWatch(RoomDrawTime.RegionConnections);
+            DrawConnections(renderer);
+            Main.RoomTimeLogger.FinishWatch();
         }
 
         public bool TryGetRoom(string name, [NotNullWhen(true)] out Room? room)
