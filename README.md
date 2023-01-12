@@ -12,6 +12,8 @@ When all rooms are loaded, you can:
 - Zoom using mouse wheel
 - Select and move rooms using right mouse button
 
+- Press F3 to switch room connections
+- Press F4 to switch parallax effect (WIP)
 - Press F5 to switch room layer visibility
 - Press F6 to switch room tile layer visibility
 - Press F8 to start region rendering
@@ -19,3 +21,7 @@ When all rooms are loaded, you can:
     RainMap will ask for result file path then start rendering all rooms into single image file
     
     All visible layers at the moment os starting the render will be visible in the final render
+
+Debug keys:
+- F7: Reinit some room rendering parameters
+- F9: Show draw timings
