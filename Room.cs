@@ -311,6 +311,21 @@ namespace RainMap
                 && WorldPos.Y + ScreenStart.Y < br.Y
                 && tl.Y < WorldPos.Y + ScreenSize.Y + ScreenStart.Y;
         }
+
+        public bool ScreenIntersectsWith(int screen, Vector2 tl, Vector2 br)
+        {
+            if (CameraScreens[screen] is null)
+                return false;
+
+            Vector2 screenTL = CameraPositions[screen] + WorldPos;
+            Vector2 screenBR = screenTL + CameraScreens[screen]!.Texture.Size();
+
+            return screenTL.X < br.X
+                && tl.X < screenBR.X
+                && screenTL.Y < br.Y
+                && tl.Y < screenBR.Y;
+        }
+
         public void Update()
         {
             CurrentRoom = this;
@@ -332,25 +347,23 @@ namespace RainMap
             CurrentRoom = this;
             Rendered = false;
 
-            if (!IntersectsWith(renderer.InverseTransformVector(Vector2.Zero), renderer.InverseTransformVector(renderer.Size)))
+            Vector2 rendererTL = renderer.InverseTransformVector(Vector2.Zero);
+            Vector2 rendererBR = renderer.InverseTransformVector(renderer.Size);
+
+            if (!IntersectsWith(rendererTL, rendererBR))
                 return;
 
             PrepareDraw();
 
             for (int i = 0; i < CameraScreens.Length; i++)
-                DrawScreen(renderer, i);
+                if (ScreenIntersectsWith(i, rendererTL, rendererBR))
+                    DrawScreen(renderer, i);
 
             Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
             Vector2 nameSize = Main.Consolas10.MeasureString(Name);
             Vector2 namePos = renderer.TransformVector(WorldPos + ScreenStart + new Vector2(ScreenSize.X / 2, 0)) - new Vector2(nameSize.X / 2, 0);
             Main.SpriteBatch.DrawStringShaded(Main.Consolas10, Name, namePos, Color.Yellow);
 
-            //Vector2 dtPos = renderer.TransformVector(WorldPos + ScreenStart);
-            //if (dtPos.X < 0) dtPos.X = 0;
-            //if (dtPos.Y < 0) dtPos.Y = 0;
-            //
-            //
-            //Main.SpriteBatch.DrawStringShaded(Main.Consolas10, $"DT: {DrawWatch.Elapsed.TotalMilliseconds:0.00}ms", dtPos, Color.Yellow);
             Main.SpriteBatch.End();
 
             Rendered = true;
