@@ -78,9 +78,9 @@ float4 MainPS(ShaderData i) : COLOR
         else
             effectCol = green;
 
-        half shadow = tex2D(NoiseTex, float2((i.uv.x * 0.5) + (_RAIN * 0.1 * _cloudsSpeed) - (0.003 * fmod(red, 30.0)), 1 - (i.uv.y * 0.5) + (_RAIN * 0.2 * _cloudsSpeed) - (0.003 * fmod(red, 30.0)))).x;
+        half shadow = tex2D(NoiseTex, float2((i.uv.x * 0.5) + (_RAIN * 0.1 * 0) - (0.003 * fmod(red, 30.0)), 1 - (i.uv.y * 0.5) + (_RAIN * 0.2 * 0) - (0.003 * fmod(red, 30.0)))).x;
 
-        shadow = 0.5 + sin(fmod(shadow + (_RAIN * 0.1 * _cloudsSpeed) - i.uv.y, 1) * 3.14 * 2) * 0.5;
+        shadow = 0.5 + sin(fmod(shadow + (_RAIN * 0.1 * 0) - i.uv.y, 1) * 3.14 * 2) * 0.5;
         shadow = clamp(((shadow - 0.5) * 6) + 0.5 - (_light * 4), 0, 1);
 
         if (red > 90)
@@ -105,7 +105,7 @@ float4 MainPS(ShaderData i) : COLOR
 
         setColor = lerp(SamplePalette(red * notFloorDark, paletteColor + 3, fade), SamplePalette(red * notFloorDark, paletteColor, fade), shadow);
         half rbcol = (sin((_RAIN + (tex2D(NoiseTex, float2(i.uv.x * 2, i.uv.y * 2)).x * 4) + red / 12.0) * 3.14 * 2) * 0.5) + 0.5;
-        setColor = lerp(setColor, SamplePalette((5.5 + rbcol * 25), 6.5, fade), (green >= 4 ? 0.2 : 0.0) * _Grime);
+        setColor = lerp(setColor, SamplePalette((5.5 + 0.75 * 25), 6.5, fade), (green >= 4 ? 0.2 : 0.0) * _Grime);
 
         if (effectCol == 100)
         {
