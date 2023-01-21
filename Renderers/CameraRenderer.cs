@@ -51,7 +51,7 @@ namespace RainMap.Renderers
 
         void UpdateDragging(bool drag, Vector2 screenPos)
         {
-            if (drag && !Dragging)
+            if (drag && !Dragging && !Interface.Hovered)
             {
                 DragPos = screenPos;
                 Dragging = true;

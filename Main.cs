@@ -100,6 +100,8 @@ namespace RainMap
             Pixel = new(GraphicsDevice, 1, 1);
             Pixel.SetData(new[] { Color.White });
 
+            UI.GraphicExtensions.Pixel = Pixel;
+
             Transparent = new(GraphicsDevice, 1, 1);
             Transparent.SetData(new[] { Color.Transparent });
 
@@ -111,13 +113,15 @@ namespace RainMap
             RoomColor.Parameters["GrabTex"]?.SetValue(Transparent);
             WaterColor.Parameters["GrabTexture"]?.SetValue(Transparent);
 
+            Interface.Init();
+
             Thread dirSelect = new(() =>
             {
                 System.Windows.Forms.FolderBrowserDialog fd = new();
                 fd.Description = "Select Rain World region";
                 if (fd.ShowDialog() != System.Windows.Forms.DialogResult.OK)
                     Exit();
-
+            
                 LoadRegion(fd.SelectedPath);
             });
             dirSelect.SetApartmentState(ApartmentState.STA);
@@ -151,7 +155,7 @@ namespace RainMap
             bool drag = IsActive && MouseState.LeftButton == ButtonState.Pressed;
             bool oldDrag = OldMouseState.LeftButton == ButtonState.Pressed;
 
-            if (drag && !oldDrag)
+            if (drag && !oldDrag && !Interface.Hovered)
             {
                 Room? room = Region?.Rooms.LastOrDefault(r => worldPos.X > r.WorldPos.X + r.ScreenStart.X
                                                                   && worldPos.Y > r.WorldPos.Y + r.ScreenStart.Y
@@ -206,26 +210,6 @@ namespace RainMap
             {
                 WorldCamera.Update();
 
-                if (KeyboardState.IsKeyDown(Keys.F3) && OldKeyboardState.IsKeyUp(Keys.F3))
-                    RenderConnections = !RenderConnections;
-
-                if (KeyboardState.IsKeyDown(Keys.F4) && OldKeyboardState.IsKeyUp(Keys.F4))
-                    UseParallax = !UseParallax;
-
-                if (KeyboardState.IsKeyDown(Keys.F5) && OldKeyboardState.IsKeyUp(Keys.F5))
-                {
-                    RenderRoomLevel = !RenderRoomLevel;
-                    if (!RenderRoomLevel)
-                        RenderRoomTiles = true;
-                }
-
-                if (KeyboardState.IsKeyDown(Keys.F6) && OldKeyboardState.IsKeyUp(Keys.F6))
-                {
-                    RenderRoomTiles = !RenderRoomTiles;
-                    if (!RenderRoomTiles)
-                        RenderRoomLevel = true;
-                }
-
                 if (KeyboardState.IsKeyDown(Keys.F7) && OldKeyboardState.IsKeyUp(Keys.F7))
                     foreach (Room room in SelectedRooms)
                         room.UpdateScreenSize();
@@ -240,60 +224,15 @@ namespace RainMap
                     $"FPS: {FPS}" +
                     $"{(TextureLoader.QueueLength == 0 ? "" : $" Loading {TextureLoader.QueueLength} textures")}";
             }
+
+            Interface.Update();
         }
 
         protected override void Draw(GameTime gameTime)
         {
             Viewport vp = GraphicsDevice.Viewport;
+            GraphicsDevice.ScissorRectangle = new(0, 0, vp.Width, vp.Height);
             Projection = Matrix.CreateOrthographicOffCenter(0, vp.Width, vp.Height, 0, 0, 1);
-
-            //if (Region is not null && Region.TryGetRoom("FS_C04", out Room? test) && test.CameraScreens.All(a => a is null || a.Loaded))
-            //{
-            //    CaptureManager.RenderTarget ??= new(GraphicsDevice, 1400, 800);
-            //
-            //    GraphicsDevice.SetRenderTarget(CaptureManager.RenderTarget);
-            //    test.PrepareDraw();
-            //    test.DrawScreen(true, 1);
-            //    GraphicsDevice.SetRenderTarget(null);
-            //
-            //    SpriteBatch.Begin();
-            //    SpriteBatch.Draw(CaptureManager.RenderTarget, new Rectangle(0, 0, 700, 400), Color.White);
-            //    SpriteBatch.End();
-            //    return;
-            //}
-
-            bool capture = IsActive && KeyboardState.IsKeyDown(Keys.F8);
-            bool oldCapture = IsActive && OldKeyboardState.IsKeyDown(Keys.F8);
-            if (capture && !oldCapture && Region is not null)
-            {
-                string? renderFile = null;
-                Thread thd = new(() =>
-                {
-                    System.Windows.Forms.SaveFileDialog sfd = new();
-                    sfd.Title = "Select render save file";
-                    sfd.Filter = "TIFF Image|*.tiff";
-                    if (sfd.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                        renderFile = sfd.FileName;
-                });
-                thd.SetApartmentState(ApartmentState.STA);
-                thd.Start();
-                thd.Join();
-
-                if (renderFile is not null)
-                {
-                    var capResult = CaptureManager.CaptureRegion(Region);
-
-                    using FileStream fs = File.Create(renderFile);
-                    Window.Title = "Saving region capture";
-                    capResult.Save(fs, new SixLabors.ImageSharp.Formats.Tiff.TiffEncoder()
-                    {
-                        Compression = SixLabors.ImageSharp.Formats.Tiff.Constants.TiffCompression.Deflate,
-                    });
-                    Window.Title = "Freeing region capture";
-                    capResult.Dispose();
-                    GC.Collect();
-                }
-            }
 
             GraphicsDevice.Clear(Region?.BackgroundColor ?? Color.CornflowerBlue);
 
@@ -341,6 +280,8 @@ namespace RainMap
                 WorldCamera.DrawRect(tl, br - tl, Color.LightBlue * 0.2f);
                 SpriteBatch.End();
             }
+
+            Interface.Draw();
 
             if (DrawTime)
             {
