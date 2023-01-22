@@ -340,7 +340,7 @@ namespace RainMap
 				foreach (PlacedObject obj in Settings.PlacedObjects)
 					obj.Update();
 
-			//UpdateWater();
+			UpdateWater();
 		}
 
 		public void Draw(Renderer renderer)
@@ -374,7 +374,7 @@ namespace RainMap
 			Vector4 lightDirAndPixelSize = new(LightAngle.X, LightAngle.Y, 0.0007142857f, 0.00125f);
 			Main.RoomColor?.Parameters["_lightDirAndPixelSize"]?.SetValue(lightDirAndPixelSize);
 		}
-		public void DrawScreen(Renderer renderer, int index)
+		public void DrawScreen(Renderer renderer, int index, bool applyPalette = false)
 		{
 			CurrentRoom = this;
 
@@ -402,7 +402,7 @@ namespace RainMap
 			//Main.SpriteBatch.End();
 
 			if (Main.RenderRoomTiles)
-				_drawScreenTiles(renderer, index);
+				_drawScreenTiles(renderer, index, applyPalette);
 			else
 				_drawScreen(renderer, index);
 	
@@ -566,6 +566,7 @@ namespace RainMap
 			return direction;
 		}
 		public Tile GetTile(Point pos) => GetTile(pos.X, pos.Y);
+
 		public Tile GetTile(int x, int y)
 		{
 			x = Math.Clamp(x, 0, Size.X - 1);
@@ -749,13 +750,17 @@ namespace RainMap
 				float closePos = Water.Surface[j, 0].pos;
 				float farPos = Water.Surface[j, 1].pos;
 
-				Vector2 close = new();
-				close.Y = Size.Y * 20 - (WaterHeight + closePos);
-				close.X = j * WaterData.TriangleSize + ScreenStart.X;
+				Vector2 close = new()
+				{
+					Y = Size.Y * 20 - (WaterHeight + closePos),
+					X = j * WaterData.TriangleSize + ScreenStart.X
+				};
 
-				Vector2 far = new();
-				far.Y = Size.Y * 20 - (WaterHeight + farPos);
-				far.X = j * WaterData.TriangleSize + ScreenStart.X;
+				Vector2 far = new()
+				{
+					Y = Size.Y * 20 - (WaterHeight + farPos),
+					X = j * WaterData.TriangleSize + ScreenStart.X
+				};
 
 				if (Main.UseParallax)
 				{
@@ -822,9 +827,11 @@ namespace RainMap
 
 				WaterData.SurfacePoint point = Water.Surface[j, 0];
 
-				Vector2 vertPos = new();
-				vertPos.Y = Size.Y * 20 - (WaterHeight + point.pos);
-				vertPos.X = j * WaterData.TriangleSize + ScreenStart.X;
+				Vector2 vertPos = new()
+				{
+					Y = Size.Y * 20 - (WaterHeight + point.pos),
+					X = j * WaterData.TriangleSize + ScreenStart.X
+				};
 
 				Vector2 texPos = (vertPos - screenpos) / screensize;
 
@@ -869,9 +876,6 @@ namespace RainMap
 
 		void DrawTileOverlay(Renderer renderer, int screenIndex, bool applyPalette = false)
 		{
-			if (!Main.RenderRoomTiles)
-				return;
-
 			float solidAlpha = 1f;
 			float waterAlpha = .1f;
 			float water2Alpha = .2f;
