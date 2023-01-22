@@ -51,7 +51,7 @@ namespace RainMap
 		public static bool RenderConnections = true;
 		public static bool RenderRoomLevel = true;
 		public static bool RenderRoomTiles = false;
-		public static bool DrawTime = true;
+		public static bool DrawInfo = true;
 		public static bool UseParallax = false;
 		public static float Scale = 1f;
 
@@ -227,7 +227,7 @@ namespace RainMap
 						room.UpdateScreenSize();
 
 				if (KeyboardState.IsKeyDown(Keys.F9) && OldKeyboardState.IsKeyUp(Keys.F9))
-					DrawTime = !DrawTime;
+					DrawInfo = !DrawInfo;
 			}
 
 			if (Region is not null)
@@ -260,50 +260,15 @@ namespace RainMap
 
 
 			if (KeyboardState.IsKeyDown(Keys.F8) && OldKeyboardState.IsKeyDown(Keys.F8) && Region is not null)
-			{
-				WorldCamera.Scale = Scale;
-
-				if (Directory.Exists("RenderRegion") == false)
-					Directory.CreateDirectory("RenderRegion");
-
-				Rgba32 bg = Region.BackgroundColor is null ? new(0) : new(Region.BackgroundColor.Value.PackedValue);
-				for (int k = 0; k < Region.Rooms.Count; k++)
-				{
-					Room room = Region.Rooms[k];
-					Instance.Window.Title = $"Rendering room {room.Name} ({k}/{Region.Rooms.Count})";
-					Image<Rgba32> capturedRoom = CaptureManager.CaptureRoom(room, bg, Scale);
-
-					string fileName = "RenderRegion/" + room.Name + (RenderRoomTiles ? "_tiles" : "") + ".png";
-
-					if (File.Exists(fileName))
-						File.Delete(fileName);
-
-					using FileStream outputStream = new(fileName, FileMode.CreateNew);
-					capturedRoom.SaveAsync(outputStream, new PngEncoder());
-				}
-				GC.Collect();
-			}
+				_SaveRegionRooms(Region);
 
 			GraphicsDevice.Clear(Region?.BackgroundColor ?? Microsoft.Xna.Framework.Color.CornflowerBlue);
 
-			SpriteBatch.Begin();
-			foreach (Room r in SelectedRooms)
-			{
-				for (int i = 0; i < r.CameraScreens.Length; i++)
-				{
-					TextureAsset? screenTex = r.CameraScreens[i];
-					if (screenTex?.Loaded is null or false)
-						continue;
-
-					WorldCamera.DrawRect(r.WorldPos + r.CameraPositions[i] - new Vector2(2) / WorldCamera.Scale, screenTex.Texture.Size() + new Vector2(4) / WorldCamera.Scale, Microsoft.Xna.Framework.Color.White * 0.4f);
-				}
-			}
-
-			SpriteBatch.End();
+			_renderRoomOnScreen(SelectedRooms);
 
 			MainTimeLogger.StartWatch(MainDrawTime.Region);
 
-			Region?.Draw(WorldCamera);
+			Region?.Draw(WorldCamera, false);
 
 			MainTimeLogger.StartWatch(MainDrawTime.Selection);
 
@@ -331,40 +296,88 @@ namespace RainMap
 				SpriteBatch.End();
 			}
 
-			if (DrawTime)
+			if (DrawInfo)
+				_DrawInfo();
+		}
+
+		protected void _renderRoomOnScreen(HashSet<Room> SelectedRooms)
+		{
+			SpriteBatch.Begin();
+
+			foreach (Room r in SelectedRooms)
 			{
-				float x = 10;
-				float y = 10;
-
-				SpriteBatch.Begin();
-				SpriteBatch.DrawStringShaded(Consolas10, $"World Camera Scale: " + WorldCamera.Scale, new(x, y), Microsoft.Xna.Framework.Color.White);
-				y += Consolas10.LineSpacing;
-				SpriteBatch.DrawStringShaded(Consolas10, $"Render Scale: " + Scale, new(x, y), Microsoft.Xna.Framework.Color.White);
-				y += Consolas10.LineSpacing;
-				SpriteBatch.DrawStringShaded(Consolas10, $"Main rendering time", new(x, y), Microsoft.Xna.Framework.Color.White);
-				y += Consolas10.LineSpacing;
-
-
-				foreach (var kvp in MainTimeLogger.Times)
+				for (int i = 0; i < r.CameraScreens.Length; i++)
 				{
-					SpriteBatch.DrawStringShaded(Consolas10, $"{kvp.Key}: {kvp.Value.TotalMilliseconds:0.00}ms", new(x, y), Microsoft.Xna.Framework.Color.White);
-					y += Consolas10.LineSpacing;
+					TextureAsset? screenTex = r.CameraScreens[i];
+					if (screenTex?.Loaded is null or false)
+						continue;
+
+					WorldCamera.DrawRect(r.WorldPos + r.CameraPositions[i] - new Vector2(2) / WorldCamera.Scale, screenTex.Texture.Size() + new Vector2(4) / WorldCamera.Scale, Microsoft.Xna.Framework.Color.White * 0.4f);
 				}
-
-				y += Consolas10.LineSpacing;
-				SpriteBatch.DrawStringShaded(Consolas10, $"Room rendering times", new(x, y), Microsoft.Xna.Framework.Color.White);
-				y += Consolas10.LineSpacing;
-
-				foreach (var kvp in RoomTimeLogger.Times)
-				{
-					SpriteBatch.DrawStringShaded(Consolas10, $"{kvp.Key}: {kvp.Value.TotalMilliseconds:0.00}ms", new(x, y), Microsoft.Xna.Framework.Color.White);
-					y += Consolas10.LineSpacing;
-				}
-
-				SpriteBatch.End();
 			}
 
-			//base.Draw(gameTime);
+			SpriteBatch.End();
+		}
+
+		protected void _SaveRegionRooms(Region Region)
+		{
+			Scale = RenderRoomTiles ? 1f / 20f : Scale;
+			WorldCamera.Scale = Scale;
+
+			if (Directory.Exists("RenderRegion") == false)
+				Directory.CreateDirectory("RenderRegion");
+
+			Rgba32 bg = Region.BackgroundColor is null ? new(0) : new(Region.BackgroundColor.Value.PackedValue);
+			for (int k = 0; k < Region.Rooms.Count; k++)
+			{
+				Room room = Region.Rooms[k];
+				Instance.Window.Title = $"Rendering room {room.Name} ({k}/{Region.Rooms.Count})";
+				Image<Rgba32> capturedRoom = CaptureManager.CaptureRoom(room, bg, Scale);
+
+				string fileName = "RenderRegion/" + room.Name + (RenderRoomTiles ? "_tiles" : "") + ".png";
+
+				if (File.Exists(fileName))
+					File.Delete(fileName);
+
+				using FileStream outputStream = new(fileName, FileMode.CreateNew);
+				capturedRoom.SaveAsync(outputStream, new PngEncoder());
+			}
+			GC.Collect();
+
+			WorldCamera.Scale = 1;
+		}
+
+		protected void _DrawInfo()
+		{
+			float x = 10;
+			float y = 10;
+
+			SpriteBatch.Begin();
+			SpriteBatch.DrawStringShaded(Consolas10, $"World Camera Scale: " + WorldCamera.Scale, new(x, y), Microsoft.Xna.Framework.Color.White);
+			y += Consolas10.LineSpacing;
+			SpriteBatch.DrawStringShaded(Consolas10, $"Render Scale: " + Scale, new(x, y), Microsoft.Xna.Framework.Color.White);
+			y += Consolas10.LineSpacing;
+			SpriteBatch.DrawStringShaded(Consolas10, $"Main rendering time", new(x, y), Microsoft.Xna.Framework.Color.White);
+			y += Consolas10.LineSpacing;
+
+
+			foreach (var kvp in MainTimeLogger.Times)
+			{
+				SpriteBatch.DrawStringShaded(Consolas10, $"{kvp.Key}: {kvp.Value.TotalMilliseconds:0.00}ms", new(x, y), Microsoft.Xna.Framework.Color.White);
+				y += Consolas10.LineSpacing;
+			}
+
+			y += Consolas10.LineSpacing;
+			SpriteBatch.DrawStringShaded(Consolas10, $"Room rendering times", new(x, y), Microsoft.Xna.Framework.Color.White);
+			y += Consolas10.LineSpacing;
+
+			foreach (var kvp in RoomTimeLogger.Times)
+			{
+				SpriteBatch.DrawStringShaded(Consolas10, $"{kvp.Key}: {kvp.Value.TotalMilliseconds:0.00}ms", new(x, y), Microsoft.Xna.Framework.Color.White);
+				y += Consolas10.LineSpacing;
+			}
+
+			SpriteBatch.End();
 		}
 
 		protected override void EndDraw()
@@ -406,16 +419,21 @@ namespace RainMap
 					rwpath = Path.GetDirectoryName(rwpath);
 				}
 
+
+				string assetsPath = Path.Combine(rwpath, "RainWorld_Data\\StreamingAssets");
+				string palettePath = Path.Combine(rwpath, "RainWorld_Data\\StreamingAssets\\palettes");
+
 				RainWorldDir = rwpath;
-				Noise = Texture2D.FromFile(GraphicsDevice, Path.Combine(rwpath, "Assets\\Futile\\Resources\\Palettes\\noise.png"));
-				EffectColors = Texture2D.FromFile(GraphicsDevice, Path.Combine(rwpath, "Assets\\Futile\\Resources\\Palettes\\effectColors.png"));
-				Palettes.SetPalettePath(Path.Combine(rwpath, "Assets\\Futile\\Resources\\Palettes"));
+				Palettes.SetPalettePath(palettePath);
+
+				Noise = Texture2D.FromFile(GraphicsDevice, palettePath + "\\noise.png");
+				EffectColors = Texture2D.FromFile(GraphicsDevice, palettePath + "\\effectColors.png");
 
 				RoomColor.Parameters["NoiseTex"]?.SetValue(Noise);
 				WaterColor.Parameters["NoiseTex"]?.SetValue(Noise);
 				RoomColor.Parameters["EffectColors"]?.SetValue(EffectColors);
 
-				GameAssets.LoadAssets(Path.Combine(rwpath, "Assets\\Futile\\Resources\\Atlases"));
+				GameAssets.LoadAssets(assetsPath);
 
 				ThreadPool.QueueUserWorkItem((_) =>
 				{

@@ -38,7 +38,7 @@ namespace RainMap
 
             Dictionary<string, string?[]> connections = new();
 
-            string roomsDir = Path.Combine(path, "Rooms");
+            string roomsDir = path + "-rooms";
 
             for (int i = 0; i < worldLines.Length; i++) 
             {
@@ -202,16 +202,19 @@ namespace RainMap
                 room.Update();
         }
 
-        public void Draw(Renderer renderer)
+        public void Draw(Renderer renderer, bool isConnecionsDraw)
         {
             Main.RoomTimeLogger.ResetWatches();
 
             foreach (Room room in Rooms)
                 room.Draw(renderer);
             
-            Main.RoomTimeLogger.StartWatch(RoomDrawTime.RegionConnections);
-            DrawConnections(renderer);
-            Main.RoomTimeLogger.FinishWatch();
+            if (isConnecionsDraw)
+            {
+				Main.RoomTimeLogger.StartWatch(RoomDrawTime.RegionConnections);
+				DrawConnections(renderer);
+				Main.RoomTimeLogger.FinishWatch();
+			}
         }
 
         public bool TryGetRoom(string name, [NotNullWhen(true)] out Room? room)
@@ -261,7 +264,7 @@ namespace RainMap
             Main.SpriteBatch.End();
         }
 
-        void DrawConnection(Vector2 start, Vector2 startDir, Vector2 end, Vector2 endDir, Renderer renderer)
+        public void DrawConnection(Vector2 start, Vector2 startDir, Vector2 end, Vector2 endDir, Renderer renderer)
         {
             renderer.DrawRect(start - new Vector2(2) / renderer.Scale, new Vector2(4) / renderer.Scale, Color.White);
             renderer.DrawRect(end - new Vector2(2) / renderer.Scale, new Vector2(4) / renderer.Scale, Color.White);

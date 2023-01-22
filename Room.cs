@@ -3,11 +3,13 @@ using Microsoft.Xna.Framework.Graphics;
 using RainMap.PlacedObjects;
 using RainMap.Renderers;
 using RainMap.Structures;
+using SixLabors.Fonts;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace RainMap
 {
@@ -338,7 +340,7 @@ namespace RainMap
 				foreach (PlacedObject obj in Settings.PlacedObjects)
 					obj.Update();
 
-			UpdateWater();
+			//UpdateWater();
 		}
 
 		public void Draw(Renderer renderer)
@@ -375,10 +377,6 @@ namespace RainMap
 		public void DrawScreen(Renderer renderer, int index)
 		{
 			CurrentRoom = this;
-			TextureAsset? texture = CameraScreens[index];
-
-			if (texture is null)
-				return;
 
 			//GrabBuffer.Clear();
 			//
@@ -403,99 +401,113 @@ namespace RainMap
 			//renderer.DrawTexture(GrabBuffer.Target!, CameraPositions[index] + WorldPos, GrabBuffer.CurrentSource, texture.Texture.Size(), Color.White, Vector2.One * scale2);
 			//Main.SpriteBatch.End();
 
-			if (!Main.RenderRoomTiles)
+			if (Main.RenderRoomTiles)
+				_drawScreenTiles(renderer, index);
+			else
+				_drawScreen(renderer, index);
+	
+
+			Main.RoomTimeLogger.FinishWatch();
+		}
+
+		protected void _drawScreen(Renderer renderer, int index)
+		{
+			TextureAsset? texture = CameraScreens[index];
+
+			if (texture is null)
+				return;
+
+			Main.RoomTimeLogger.StartWatch(RoomDrawTime.RoomLevel, true);
+
+			Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
+
+			if (Main.RoomColor is not null)
 			{
-				Main.RoomTimeLogger.StartWatch(RoomDrawTime.RoomLevel, true);
+				Main.RoomColor.Parameters["Projection"]?.SetValue(renderer.Projection);
+				ApplyPaletteToShader(Main.RoomColor, index);
+				ApplyLevelToShader(Main.RoomColor, index, renderer);
+				//GrabBuffer.ApplyToShader(Main.RoomColor);
 
-				Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
+				if (Settings?.EffectColorA is not null)
+					Main.RoomColor.Parameters["EffectColorA"]?.SetValue(Settings.EffectColorA.Value);
 
-				if (Main.RoomColor is not null)
-				{
-					Main.RoomColor.Parameters["Projection"]?.SetValue(renderer.Projection);
-					ApplyPaletteToShader(Main.RoomColor, index);
-					ApplyLevelToShader(Main.RoomColor, index, renderer);
-					//GrabBuffer.ApplyToShader(Main.RoomColor);
+				if (Settings?.EffectColorB is not null)
+					Main.RoomColor.Parameters["EffectColorB"]?.SetValue(Settings.EffectColorB.Value);
 
-					if (Settings?.EffectColorA is not null)
-						Main.RoomColor.Parameters["EffectColorA"]?.SetValue(Settings.EffectColorA.Value);
+				Main.RoomColor.Parameters["_light"]?.SetValue(MathHelper.Lerp(1, -1, Settings?.Clouds ?? 0));
+				Main.RoomColor.Parameters["_Grime"]?.SetValue(Settings?.Grime ?? 0.5f);
+				Main.RoomColor.CurrentTechnique.Passes[0].Apply();
+			}
+			renderer.DrawTexture(texture.Texture, WorldPos + CameraPositions[index], null, CameraScreens[index]?.Texture.Size() ?? Vector2.Zero);
+			Main.SpriteBatch.End();
 
-					if (Settings?.EffectColorB is not null)
-						Main.RoomColor.Parameters["EffectColorB"]?.SetValue(Settings.EffectColorB.Value);
-
-					Main.RoomColor.Parameters["_light"]?.SetValue(MathHelper.Lerp(1, -1, Settings?.Clouds ?? 0));
-					Main.RoomColor.Parameters["_Grime"]?.SetValue(Settings?.Grime ?? 0.5f);
-					Main.RoomColor.CurrentTechnique.Passes[0].Apply();
-				}
-				renderer.DrawTexture(texture.Texture, WorldPos + CameraPositions[index], null, CameraScreens[index]?.Texture.Size() ?? Vector2.Zero);
-				Main.SpriteBatch.End();
-
-				//float lrad = 12000;
-				//if (IntersectsWith(mouseWorld - new Vector2(lrad), mouseWorld + new Vector2(lrad)))
-				//    DrawLight(renderer, mouseWorld - WorldPos, lrad, Color.Black, index);
+			//float lrad = 12000;
+			//if (IntersectsWith(mouseWorld - new Vector2(lrad), mouseWorld + new Vector2(lrad)))
+			//    DrawLight(renderer, mouseWorld - WorldPos, lrad, Color.Black, index);
 				Main.RoomTimeLogger.StartWatch(RoomDrawTime.ObjectLights, true);
 				DrawObjectLights(renderer, index);
 				Main.RoomTimeLogger.StartWatch(RoomDrawTime.Water, true);
 				DrawWater(renderer, index);
 
-				//if (mouse && renderer.Scale > 0.5f)
-				//{
-				//    Main.SpriteBatch.Begin();
-				//    renderer.DrawRect(mouseWorld - new Vector2(5), new(10), PixelColorAtCoordinate(mouseWorld - WorldPos));
-				//    Main.SpriteBatch.End();
-				//
-				//}
-			}
-			else
-			{
-				Main.RoomTimeLogger.StartWatch(RoomDrawTime.Tiles, true);
+			//if (mouse && renderer.Scale > 0.5f)
+			//{
+			//	Main.SpriteBatch.Begin();
+			//	renderer.DrawRect(mouseWorld - new Vector2(5), new(10), PixelColorAtCoordinate(mouseWorld - WorldPos));
+			//	Main.SpriteBatch.End();
 
-				Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
-
-				if (Main.RoomColor is not null)
-				{
-					Main.RoomColor.Parameters["Projection"]?.SetValue(renderer.Projection);
-					ApplyPaletteToShader(Main.RoomColor, index);
-					ApplyLevelToShader(Main.RoomColor, index, renderer);
-					//GrabBuffer.ApplyToShader(Main.RoomColor);
-
-					if (Settings?.EffectColorA is not null)
-						Main.RoomColor.Parameters["EffectColorA"]?.SetValue(Settings.EffectColorA.Value);
-
-					if (Settings?.EffectColorB is not null)
-						Main.RoomColor.Parameters["EffectColorB"]?.SetValue(Settings.EffectColorB.Value);
-
-					Main.RoomColor.Parameters["_light"]?.SetValue(MathHelper.Lerp(1, -1, Settings?.Clouds ?? 0));
-					Main.RoomColor.Parameters["_Grime"]?.SetValue(Settings?.Grime ?? 0.5f);
-					Main.RoomColor.CurrentTechnique.Passes[0].Apply();
-				}
-
-				float bgAlpha = 1f;
-				Color bgColor = SamplePalette(0, 7, index); // Color.Gray
-				renderer.DrawTexture(Main.Pixel, WorldPos + CameraPositions[index], null, CameraScreens[index]?.Texture.Size() ?? Vector2.Zero, bgColor * bgAlpha);
-				Main.SpriteBatch.End();
-				DrawTileOverlay(renderer, index);
-
-				//float lrad = 12000;
-				//if (IntersectsWith(mouseWorld - new Vector2(lrad), mouseWorld + new Vector2(lrad)))
-				//    DrawLight(renderer, mouseWorld - WorldPos, lrad, Color.Black, index);
-				//Main.RoomTimeLogger.StartWatch(RoomDrawTime.ObjectLights, true);
-				//DrawObjectLights(renderer, index);
-				//Main.RoomTimeLogger.StartWatch(RoomDrawTime.Water, true);
-				//DrawWater(renderer, index);
-
-				//if (mouse && renderer.Scale > 0.5f)
-				//{
-				//    Main.SpriteBatch.Begin();
-				//    renderer.DrawRect(mouseWorld - new Vector2(5), new(10), PixelColorAtCoordinate(mouseWorld - WorldPos));
-				//    Main.SpriteBatch.End();
-				//
-				//}
-
-
-			}
-
-			Main.RoomTimeLogger.FinishWatch();
+			//}
 		}
+
+		protected void _drawScreenTiles(Renderer renderer, int index, bool applyPalette = false)
+		{
+			Main.RoomTimeLogger.StartWatch(RoomDrawTime.Tiles, true);
+
+			Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
+
+			if (applyPalette && Main.RoomColor is not null)
+			{
+				Main.RoomColor.Parameters["Projection"]?.SetValue(renderer.Projection);
+				ApplyPaletteToShader(Main.RoomColor, index);
+				ApplyLevelToShader(Main.RoomColor, index, renderer);
+				//GrabBuffer.ApplyToShader(Main.RoomColor);
+
+				if (Settings?.EffectColorA is not null)
+					Main.RoomColor.Parameters["EffectColorA"]?.SetValue(Settings.EffectColorA.Value);
+
+				if (Settings?.EffectColorB is not null)
+					Main.RoomColor.Parameters["EffectColorB"]?.SetValue(Settings.EffectColorB.Value);
+
+				Main.RoomColor.Parameters["_light"]?.SetValue(MathHelper.Lerp(1, -1, Settings?.Clouds ?? 0));
+				Main.RoomColor.Parameters["_Grime"]?.SetValue(Settings?.Grime ?? 0.5f);
+				Main.RoomColor.CurrentTechnique.Passes[0].Apply();
+			}
+
+			float bgAlpha = 1f;
+			Color bgColor = applyPalette ? SamplePalette(0, 7, index) : Color.Gray;
+			renderer.DrawTexture(Main.Pixel, WorldPos + CameraPositions[index], null, CameraScreens[index]?.Texture.Size() ?? Vector2.Zero, bgColor * bgAlpha);
+			Main.SpriteBatch.End();
+			DrawTileOverlay(renderer, index, applyPalette);
+
+			//float lrad = 12000;
+			//if (IntersectsWith(mouseWorld - new Vector2(lrad), mouseWorld + new Vector2(lrad)))
+			//    DrawLight(renderer, mouseWorld - WorldPos, lrad, Color.Black, index);
+			//Main.RoomTimeLogger.StartWatch(RoomDrawTime.ObjectLights, true);
+			//DrawObjectLights(renderer, index);
+			//Main.RoomTimeLogger.StartWatch(RoomDrawTime.Water, true);
+			//DrawWater(renderer, index);
+
+			//if (mouse && renderer.Scale > 0.5f)
+			//{
+			//    Main.SpriteBatch.Begin();
+			//    renderer.DrawRect(mouseWorld - new Vector2(5), new(10), PixelColorAtCoordinate(mouseWorld - WorldPos));
+			//    Main.SpriteBatch.End();
+			//
+			//}
+
+
+		}
+
+
 		public void UpdateScreenSize()
 		{
 			Vector2 max = new(0, 0);
@@ -855,7 +867,7 @@ namespace RainMap
 			}
 		}
 
-		void DrawTileOverlay(Renderer renderer, int screenIndex)
+		void DrawTileOverlay(Renderer renderer, int screenIndex, bool applyPalette = false)
 		{
 			if (!Main.RenderRoomTiles)
 				return;
@@ -865,10 +877,10 @@ namespace RainMap
 			float water2Alpha = .2f;
 			float wallAlpha = .4f;
 
-			Color solidColor = SamplePalette(0, 3, screenIndex); // Color.Black
-			Color waterColor = SamplePalette(4, 7, screenIndex); // Color.Blue
-			Color water2Color = SamplePalette(5, 7, screenIndex); // Color.Blue
-			Color wallColor = SamplePalette(10, 3, screenIndex); // Color.Black
+			Color solidColor = applyPalette ? SamplePalette(0, 3, screenIndex) : Color.Black;
+			Color waterColor = applyPalette ? SamplePalette(4, 7, screenIndex) : Color.Blue;
+			Color water2Color = applyPalette ? SamplePalette(5, 7, screenIndex) : Color.Blue;
+			Color wallColor = applyPalette ? SamplePalette(10, 3, screenIndex) : Color.Black;
 
 			Matrix matrix = Matrix.Multiply(Matrix.CreateScale(20), Matrix.CreateTranslation(new(WorldPos, 0)));
 			matrix = Matrix.Multiply(matrix, renderer.Transform);
