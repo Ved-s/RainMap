@@ -3,12 +3,13 @@ using Microsoft.Xna.Framework.Graphics;
 using RainMap.PlacedObjects;
 using RainMap.Renderers;
 using RainMap.Structures;
+using SixLabors.Fonts;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace RainMap
 {
@@ -373,23 +374,19 @@ namespace RainMap
             Vector4 lightDirAndPixelSize = new(LightAngle.X, LightAngle.Y, 0.0007142857f, 0.00125f);
             Main.RoomColor?.Parameters["_lightDirAndPixelSize"]?.SetValue(lightDirAndPixelSize);
         }
-        public void DrawScreen(Renderer renderer, int index)
+        public void DrawScreen(Renderer renderer, int index, bool applyPalette = false)
         {
             CurrentRoom = this;
-            TextureAsset? texture = CameraScreens[index];
-
-            if (texture is null)
-                return;
 
             //GrabBuffer.Clear();
             //
-            float scale = Math.Min(1, renderer.Scale);
-            float scale2 = Math.Max(1, renderer.Scale);
+            //float scale = Math.Min(1, renderer.Scale);
+            //float scale2 = Math.Max(1, renderer.Scale);
             //
             //GrabBuffer.Begin(texture.Texture.Size(), scale, CameraPositions[index]);
             //
-            Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
-            bool mouse = IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50));
+            //Vector2 mouseWorld = renderer.InverseTransformVector(Main.MouseState.Position.ToVector2());
+            //bool mouse = IntersectsWith(mouseWorld - new Vector2(50), mouseWorld + new Vector2(50));
 
             ////if (mouse)
             ////{
@@ -404,53 +401,113 @@ namespace RainMap
             //renderer.DrawTexture(GrabBuffer.Target!, CameraPositions[index] + WorldPos, GrabBuffer.CurrentSource, texture.Texture.Size(), Color.White, Vector2.One * scale2);
             //Main.SpriteBatch.End();
 
-            if (Main.RenderRoomLevel)
+            if (Main.RenderRoomTiles)
+                _drawScreenTiles(renderer, index, applyPalette);
+            else
+                _drawScreen(renderer, index);
+    
+
+            Main.RoomTimeLogger.FinishWatch();
+        }
+
+        protected void _drawScreen(Renderer renderer, int index)
+        {
+            TextureAsset? texture = CameraScreens[index];
+
+            if (texture is null)
+                return;
+
+            Main.RoomTimeLogger.StartWatch(RoomDrawTime.RoomLevel, true);
+
+            Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
+
+            if (Main.RoomColor is not null)
             {
-                Main.RoomTimeLogger.StartWatch(RoomDrawTime.RoomLevel, true);
+                Main.RoomColor.Parameters["Projection"]?.SetValue(renderer.Projection);
+                ApplyPaletteToShader(Main.RoomColor, index);
+                ApplyLevelToShader(Main.RoomColor, index, renderer);
+                //GrabBuffer.ApplyToShader(Main.RoomColor);
 
-                Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
+                if (Settings?.EffectColorA is not null)
+                    Main.RoomColor.Parameters["EffectColorA"]?.SetValue(Settings.EffectColorA.Value);
 
-                if (Main.RoomColor is not null)
-                {
-                    Main.RoomColor.Parameters["Projection"]?.SetValue(renderer.Projection);
-                    ApplyPaletteToShader(Main.RoomColor, index);
-                    ApplyLevelToShader(Main.RoomColor, index, renderer);
-                    //GrabBuffer.ApplyToShader(Main.RoomColor);
+                if (Settings?.EffectColorB is not null)
+                    Main.RoomColor.Parameters["EffectColorB"]?.SetValue(Settings.EffectColorB.Value);
 
-                    if (Settings?.EffectColorA is not null)
-                        Main.RoomColor.Parameters["EffectColorA"]?.SetValue(Settings.EffectColorA.Value);
+                Main.RoomColor.Parameters["_light"]?.SetValue(MathHelper.Lerp(1, -1, Settings?.Clouds ?? 0));
+                Main.RoomColor.Parameters["_Grime"]?.SetValue(Settings?.Grime ?? 0.5f);
+                Main.RoomColor.CurrentTechnique.Passes[0].Apply();
+            }
+            renderer.DrawTexture(texture.Texture, WorldPos + CameraPositions[index], null, CameraScreens[index]?.Texture.Size() ?? Vector2.Zero);
+            Main.SpriteBatch.End();
 
-                    if (Settings?.EffectColorB is not null)
-                        Main.RoomColor.Parameters["EffectColorB"]?.SetValue(Settings.EffectColorB.Value);
-
-                    Main.RoomColor.Parameters["_light"]?.SetValue(MathHelper.Lerp(1, -1, Settings?.Clouds ?? 0));
-                    Main.RoomColor.Parameters["_Grime"]?.SetValue(Settings?.Grime ?? 0.5f);
-                    Main.RoomColor.CurrentTechnique.Passes[0].Apply();
-                }
-                renderer.DrawTexture(texture.Texture, CameraPositions[index] + WorldPos);
-
-                Main.SpriteBatch.End();
-
-                //float lrad = 12000;
-                //if (IntersectsWith(mouseWorld - new Vector2(lrad), mouseWorld + new Vector2(lrad)))
-                //    DrawLight(renderer, mouseWorld - WorldPos, lrad, Color.Black, index);
+            //float lrad = 12000;
+            //if (IntersectsWith(mouseWorld - new Vector2(lrad), mouseWorld + new Vector2(lrad)))
+            //    DrawLight(renderer, mouseWorld - WorldPos, lrad, Color.Black, index);
                 Main.RoomTimeLogger.StartWatch(RoomDrawTime.ObjectLights, true);
                 DrawObjectLights(renderer, index);
                 Main.RoomTimeLogger.StartWatch(RoomDrawTime.Water, true);
                 DrawWater(renderer, index);
 
-                //if (mouse && renderer.Scale > 0.5f)
-                //{
-                //    Main.SpriteBatch.Begin();
-                //    renderer.DrawRect(mouseWorld - new Vector2(5), new(10), PixelColorAtCoordinate(mouseWorld - WorldPos));
-                //    Main.SpriteBatch.End();
-                //
-                //}
-            }
-            Main.RoomTimeLogger.StartWatch(RoomDrawTime.Tiles, true);
-            DrawTileOverlay(renderer, index);
-            Main.RoomTimeLogger.FinishWatch();
+            //if (mouse && renderer.Scale > 0.5f)
+            //{
+            //	Main.SpriteBatch.Begin();
+            //	renderer.DrawRect(mouseWorld - new Vector2(5), new(10), PixelColorAtCoordinate(mouseWorld - WorldPos));
+            //	Main.SpriteBatch.End();
+
+            //}
         }
+
+        protected void _drawScreenTiles(Renderer renderer, int index, bool applyPalette = false)
+        {
+            Main.RoomTimeLogger.StartWatch(RoomDrawTime.Tiles, true);
+
+            Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
+
+            if (applyPalette && Main.RoomColor is not null)
+            {
+                Main.RoomColor.Parameters["Projection"]?.SetValue(renderer.Projection);
+                ApplyPaletteToShader(Main.RoomColor, index);
+                ApplyLevelToShader(Main.RoomColor, index, renderer);
+                //GrabBuffer.ApplyToShader(Main.RoomColor);
+
+                if (Settings?.EffectColorA is not null)
+                    Main.RoomColor.Parameters["EffectColorA"]?.SetValue(Settings.EffectColorA.Value);
+
+                if (Settings?.EffectColorB is not null)
+                    Main.RoomColor.Parameters["EffectColorB"]?.SetValue(Settings.EffectColorB.Value);
+
+                Main.RoomColor.Parameters["_light"]?.SetValue(MathHelper.Lerp(1, -1, Settings?.Clouds ?? 0));
+                Main.RoomColor.Parameters["_Grime"]?.SetValue(Settings?.Grime ?? 0.5f);
+                Main.RoomColor.CurrentTechnique.Passes[0].Apply();
+            }
+
+            float bgAlpha = 1f;
+            Color bgColor = applyPalette ? SamplePalette(0, 7, index) : Color.Gray;
+            renderer.DrawTexture(Main.Pixel, WorldPos + CameraPositions[index], null, CameraScreens[index]?.Texture.Size() ?? Vector2.Zero, bgColor * bgAlpha);
+            Main.SpriteBatch.End();
+            DrawTileOverlay(renderer, index, applyPalette);
+
+            //float lrad = 12000;
+            //if (IntersectsWith(mouseWorld - new Vector2(lrad), mouseWorld + new Vector2(lrad)))
+            //    DrawLight(renderer, mouseWorld - WorldPos, lrad, Color.Black, index);
+            //Main.RoomTimeLogger.StartWatch(RoomDrawTime.ObjectLights, true);
+            //DrawObjectLights(renderer, index);
+            //Main.RoomTimeLogger.StartWatch(RoomDrawTime.Water, true);
+            //DrawWater(renderer, index);
+
+            //if (mouse && renderer.Scale > 0.5f)
+            //{
+            //    Main.SpriteBatch.Begin();
+            //    renderer.DrawRect(mouseWorld - new Vector2(5), new(10), PixelColorAtCoordinate(mouseWorld - WorldPos));
+            //    Main.SpriteBatch.End();
+            //
+            //}
+
+
+        }
+
+
         public void UpdateScreenSize()
         {
             Vector2 max = new(0, 0);
@@ -509,6 +566,7 @@ namespace RainMap
             return direction;
         }
         public Tile GetTile(Point pos) => GetTile(pos.X, pos.Y);
+
         public Tile GetTile(int x, int y)
         {
             x = Math.Clamp(x, 0, Size.X - 1);
@@ -692,13 +750,17 @@ namespace RainMap
                 float closePos = Water.Surface[j, 0].pos;
                 float farPos = Water.Surface[j, 1].pos;
 
-                Vector2 close = new();
-                close.Y = Size.Y * 20 - (WaterHeight + closePos);
-                close.X = j * WaterData.TriangleSize + ScreenStart.X;
+                Vector2 close = new()
+                {
+                    Y = Size.Y * 20 - (WaterHeight + closePos),
+                    X = j * WaterData.TriangleSize + ScreenStart.X
+                };
 
-                Vector2 far = new();
-                far.Y = Size.Y * 20 - (WaterHeight + farPos);
-                far.X = j * WaterData.TriangleSize + ScreenStart.X;
+                Vector2 far = new()
+                {
+                    Y = Size.Y * 20 - (WaterHeight + farPos),
+                    X = j * WaterData.TriangleSize + ScreenStart.X
+                };
 
                 if (Main.UseParallax)
                 {
@@ -765,9 +827,11 @@ namespace RainMap
 
                 WaterData.SurfacePoint point = Water.Surface[j, 0];
 
-                Vector2 vertPos = new();
-                vertPos.Y = Size.Y * 20 - (WaterHeight + point.pos);
-                vertPos.X = j * WaterData.TriangleSize + ScreenStart.X;
+                Vector2 vertPos = new()
+                {
+                    Y = Size.Y * 20 - (WaterHeight + point.pos),
+                    X = j * WaterData.TriangleSize + ScreenStart.X
+                };
 
                 Vector2 texPos = (vertPos - screenpos) / screensize;
 
@@ -810,20 +874,17 @@ namespace RainMap
             }
         }
 
-        void DrawTileOverlay(Renderer renderer, int screenIndex)
+        void DrawTileOverlay(Renderer renderer, int screenIndex, bool applyPalette = false)
         {
-            if (!Main.RenderRoomTiles)
-                return;
-
-            float bgAlpha = Main.RenderRoomLevel ? .2f : 1;
-            float solidAlpha = Main.RenderRoomLevel ? .8f : 1;
+            float solidAlpha = 1f;
             float waterAlpha = .1f;
             float water2Alpha = .2f;
             float wallAlpha = .4f;
 
-            Main.SpriteBatch.Begin();
-            renderer.DrawTexture(Main.Pixel, WorldPos + CameraPositions[screenIndex], null, CameraScreens[screenIndex]?.Texture.Size() ?? Vector2.Zero, Color.Gray * bgAlpha);
-            Main.SpriteBatch.End();
+            Color solidColor = applyPalette ? SamplePalette(0, 3, screenIndex) : Color.Black;
+            Color waterColor = applyPalette ? SamplePalette(4, 7, screenIndex) : Color.Blue;
+            Color water2Color = applyPalette ? SamplePalette(5, 7, screenIndex) : Color.Blue;
+            Color wallColor = applyPalette ? SamplePalette(10, 3, screenIndex) : Color.Black;
 
             Matrix matrix = Matrix.Multiply(Matrix.CreateScale(20), Matrix.CreateTranslation(new(WorldPos, 0)));
             matrix = Matrix.Multiply(matrix, renderer.Transform);
@@ -858,11 +919,11 @@ namespace RainMap
                             while (x + width < xend && GetTile(x + width, y).Terrain == Tile.TerrainType.Solid)
                                 width++;
 
-                            TriangleDrawing.AddQuad(new(x, y), new(x + width, y), new(x, y + 1), new(x + width, y + 1), Color.Black * solidAlpha);
+                            TriangleDrawing.AddQuad(new(x, y), new(x + width, y), new(x, y + 1), new(x + width, y + 1), solidColor * solidAlpha);
                             break;
 
                         case Tile.TerrainType.Floor:
-                            TriangleDrawing.AddQuad(new(x, y), new(x + 1, y), new(x, y + .5f), new(x + 1, y + .5f), Color.Black * solidAlpha);
+                            TriangleDrawing.AddQuad(new(x, y), new(x + 1, y), new(x, y + .5f), new(x + 1, y + .5f), solidColor * solidAlpha);
                             break;
 
                         case Tile.TerrainType.ShortcutEntrance:
@@ -871,7 +932,7 @@ namespace RainMap
 
                         case Tile.TerrainType.Slope:
                             if (water)
-                                TriangleDrawing.AddQuad(new(x, y), new(x + 1, y), new(x, y + 1), new(x + 1, y + 1), Color.Blue * water2Alpha);
+                                TriangleDrawing.AddQuad(new(x, y), new(x + 1, y), new(x, y + 1), new(x + 1, y + 1), water2Color * water2Alpha);
 
                             for (int i = 0; i < 4; i++)
                             {
@@ -889,7 +950,7 @@ namespace RainMap
                                 Vector2 b = new(-a.Y, a.X);
                                 Vector2 c = -b;
 
-                                TriangleDrawing.AddTriangle(center + a, center + b, center + c, Color.Black * solidAlpha);
+                                TriangleDrawing.AddTriangle(center + a, center + b, center + c, solidColor * solidAlpha);
                             }
                             break;
                     }
@@ -924,26 +985,26 @@ namespace RainMap
                         switch (feature)
                         {
                             case Tile.TileAttributes.VerticalBeam:
-                                TriangleDrawing.AddQuad(new(x + .4f, y), new(x + .6f, y), new(x + .4f, y + 1), new(x + .6f, y + 1), Color.Black * solidAlpha);
+                                TriangleDrawing.AddQuad(new(x + .4f, y), new(x + .6f, y), new(x + .4f, y + 1), new(x + .6f, y + 1), solidColor * solidAlpha);
                                 break;
 
                             case Tile.TileAttributes.HorizontalBeam:
-                                TriangleDrawing.AddQuad(new(x, y + .4f), new(x + 1, y + .4f), new(x, y + .6f), new(x + 1, y + .6f), Color.Black * solidAlpha);
+                                TriangleDrawing.AddQuad(new(x, y + .4f), new(x + 1, y + .4f), new(x, y + .6f), new(x + 1, y + .6f), solidColor * solidAlpha);
                                 break;
 
                             case Tile.TileAttributes.WallBehind:
-                                TriangleDrawing.AddQuad(new(x, y), new(x + 1, y), new(x, y + 1), new(x + 1, y + 1), Color.Black * wallAlpha);
+                                TriangleDrawing.AddQuad(new(x, y), new(x + 1, y), new(x, y + 1), new(x + 1, y + 1), wallColor * wallAlpha);
                                 break;
 
                             case Tile.TileAttributes.Hive:
                                 TriangleDrawing.AddTriangle(
-                                    new(x + .05f, y + 1), Color.Black * solidAlpha,
+                                    new(x + .05f, y + 1), solidColor * solidAlpha,
                                     new(x + .275f, y + .3f), Color.White,
-                                    new(x + .5f, y + 1), Color.Black * solidAlpha);
+                                    new(x + .5f, y + 1), solidColor * solidAlpha);
                                 TriangleDrawing.AddTriangle(
-                                    new(x + .5f, y + 1), Color.Black * solidAlpha,
+                                    new(x + .5f, y + 1), solidColor * solidAlpha,
                                     new(x + .725f, y + .6f), Color.Gray,
-                                    new(x + 1f, y + 1), Color.Black * solidAlpha);
+                                    new(x + 1f, y + 1), solidColor * solidAlpha);
                                 break;
                             case Tile.TileAttributes.Waterfall:
                                 break;
@@ -960,7 +1021,7 @@ namespace RainMap
                                     float right = left + 0.25f;
 
                                     Color topColor = new Color(.2f, .2f, .2f) * solidAlpha;
-                                    Color bottomColor = Color.Black * solidAlpha;
+                                    Color bottomColor = solidColor * solidAlpha;
 
                                     TriangleDrawing.AddQuad(
                                         new(left, top), topColor,
@@ -989,7 +1050,7 @@ namespace RainMap
                         while (x - width >= xstart && GetTile(x - width, y).Terrain is not Tile.TerrainType.Solid and not Tile.TerrainType.Slope)
                             width++;
 
-                        TriangleDrawing.AddQuad(new(x - width + 1, y), new(x + 1, y), new(x - width + 1, y + 1), new(x + 1, y + 1), Color.Blue * water2Alpha);
+                        TriangleDrawing.AddQuad(new(x - width + 1, y), new(x + 1, y), new(x - width + 1, y + 1), new(x + 1, y + 1), water2Color * water2Alpha);
                     }
                 }
             }
@@ -997,7 +1058,7 @@ namespace RainMap
             if (WaterInFrontOfTerrain)
             {
                 int y = Size.Y - WaterLevel;
-                TriangleDrawing.AddQuad(new(xstart, y), new(xend, y), new(xstart, yend), new(xend, yend), Color.Blue * waterAlpha);
+                TriangleDrawing.AddQuad(new(xstart, y), new(xend, y), new(xstart, yend), new(xend, yend), waterColor * waterAlpha);
             }
 
             Main.PixelEffect.Projection = matrix;

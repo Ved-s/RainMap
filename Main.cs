@@ -3,10 +3,12 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using RainMap.Renderers;
 using RainMap.Structures;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -49,24 +51,23 @@ namespace RainMap
         public static bool RenderConnections = true;
         public static bool RenderRoomLevel = true;
         public static bool RenderRoomTiles = false;
-        public static bool DrawTime = false;
+        public static bool DrawInfo = true;
         public static bool UseParallax = false;
+        public static int Scale = 1;
 
         public static string RainWorldDir = null!;
 
-        public static TimeLogger<MainDrawTime> MainTimeLogger = new(); 
-        public static TimeLogger<RoomDrawTime> RoomTimeLogger = new(); 
-
-        static int FPS;
-        static int FPSCounter;
-        static Stopwatch FPSWatcher = new();
-
-        static HashSet<Room> SelectedRooms = new();
-        static Vector2 OldDragPos;
-        static bool Selecting;
-        static bool Dragging;
-        static Thread MainThread = null!;
-        static Queue<Action> MainQueue = new();
+        public static TimeLogger<MainDrawTime> MainTimeLogger = new();
+        public static TimeLogger<RoomDrawTime> RoomTimeLogger = new();
+        private static int FPS;
+        private static int FPSCounter;
+        private static Stopwatch FPSWatcher = new();
+        private static HashSet<Room> SelectedRooms = new();
+        private static Vector2 OldDragPos;
+        private static bool Selecting;
+        private static bool Dragging;
+        private static Thread MainThread = null!;
+        private static Queue<Action> MainQueue = new();
 
         public Main()
         {
@@ -98,12 +99,12 @@ namespace RainMap
             Consolas10 = Content.Load<SpriteFont>("Consolas10");
 
             Pixel = new(GraphicsDevice, 1, 1);
-            Pixel.SetData(new[] { Color.White });
+            Pixel.SetData(new[] { Microsoft.Xna.Framework.Color.White });
 
             UI.GraphicExtensions.Pixel = Pixel;
 
             Transparent = new(GraphicsDevice, 1, 1);
-            Transparent.SetData(new[] { Color.Transparent });
+            Transparent.SetData(new[] { Microsoft.Xna.Framework.Color.Transparent });
 
             PixelEffect = new(GraphicsDevice);
             PixelEffect.Texture = Pixel;
@@ -121,7 +122,7 @@ namespace RainMap
                 fd.Description = "Select Rain World region";
                 if (fd.ShowDialog() != System.Windows.Forms.DialogResult.OK)
                     Exit();
-            
+
                 LoadRegion(fd.SelectedPath);
             });
             dirSelect.SetApartmentState(ApartmentState.STA);
@@ -211,11 +212,15 @@ namespace RainMap
                 WorldCamera.Update();
 
                 if (KeyboardState.IsKeyDown(Keys.F7) && OldKeyboardState.IsKeyUp(Keys.F7))
-                    foreach (Room room in SelectedRooms)
-                        room.UpdateScreenSize();
+                {
+
+                }
+
+                if (KeyboardState.IsKeyDown(Keys.F8) && OldKeyboardState.IsKeyDown(Keys.F8) && Region is not null)
+                    _SaveRegionRooms(Region);
 
                 if (KeyboardState.IsKeyDown(Keys.F9) && OldKeyboardState.IsKeyUp(Keys.F9))
-                    DrawTime = !DrawTime;
+                    DrawInfo = !DrawInfo;
             }
 
             if (Region is not null)
@@ -234,26 +239,11 @@ namespace RainMap
             GraphicsDevice.ScissorRectangle = new(0, 0, vp.Width, vp.Height);
             Projection = Matrix.CreateOrthographicOffCenter(0, vp.Width, vp.Height, 0, 0, 1);
 
-            GraphicsDevice.Clear(Region?.BackgroundColor ?? Color.CornflowerBlue);
-
-            SpriteBatch.Begin();
-            foreach (Room r in SelectedRooms)
-            {
-                for (int i = 0; i < r.CameraScreens.Length; i++)
-                {
-                    TextureAsset? screenTex = r.CameraScreens[i];
-                    if (screenTex?.Loaded is null or false)
-                        continue;
-
-                    WorldCamera.DrawRect(r.WorldPos + r.CameraPositions[i] - new Vector2(2) / WorldCamera.Scale, screenTex.Texture.Size() + new Vector2(4) / WorldCamera.Scale, Color.White * 0.4f);
-                }
-            }
-
-            SpriteBatch.End();
+_renderRoomsOnScreen(SelectedRooms);
 
             MainTimeLogger.StartWatch(MainDrawTime.Region);
 
-            Region?.Draw(WorldCamera);
+            Region?.Draw(WorldCamera, RenderConnections);
 
             MainTimeLogger.StartWatch(MainDrawTime.Selection);
 
@@ -263,8 +253,8 @@ namespace RainMap
 
                 Room r = SelectedRooms.First();
 
-                WorldCamera.DrawRect(r.WorldPos, r.Size.ToVector2() * 20, null, Color.Lime * 0.3f);
-                WorldCamera.DrawRect(r.WorldPos + r.ScreenStart, r.ScreenSize, null, Color.Red * 0.3f);
+                WorldCamera.DrawRect(r.WorldPos, r.Size.ToVector2() * 20, null, Microsoft.Xna.Framework.Color.Lime * 0.3f);
+                WorldCamera.DrawRect(r.WorldPos + r.ScreenStart, r.ScreenSize, null, Microsoft.Xna.Framework.Color.Red * 0.3f);
                 SpriteBatch.End();
             }
 
@@ -277,41 +267,89 @@ namespace RainMap
                 Vector2 tl = new(Math.Min(a.X, b.X), Math.Min(a.Y, b.Y));
                 Vector2 br = new(Math.Max(a.X, b.X), Math.Max(a.Y, b.Y));
 
-                WorldCamera.DrawRect(tl, br - tl, Color.LightBlue * 0.2f);
+                WorldCamera.DrawRect(tl, br - tl, Microsoft.Xna.Framework.Color.LightBlue * 0.2f);
                 SpriteBatch.End();
             }
 
             Interface.Draw();
 
-            if (DrawTime)
+            if (DrawInfo)
+                _DrawInfo();
+        }
+
+        private void _renderRoomsOnScreen(HashSet<Room> SelectedRooms)
+        {
+            SpriteBatch.Begin();
+
+            foreach (Room r in SelectedRooms)
             {
-                float x = 10;
-                float y = 10;
-
-                SpriteBatch.Begin();
-                SpriteBatch.DrawStringShaded(Consolas10, $"Main rendering time", new(x, y), Color.White);
-                y += Consolas10.LineSpacing;
-
-                foreach (var kvp in MainTimeLogger.Times)
+                for (int i = 0; i < r.CameraScreens.Length; i++)
                 {
-                    SpriteBatch.DrawStringShaded(Consolas10, $"{kvp.Key}: {kvp.Value.TotalMilliseconds:0.00}ms", new(x, y), Color.White);
-                    y += Consolas10.LineSpacing;
-                }
+                    TextureAsset? screenTex = r.CameraScreens[i];
+                    if (screenTex?.Loaded is null or false)
+                        continue;
 
-                y += Consolas10.LineSpacing;
-                SpriteBatch.DrawStringShaded(Consolas10, $"Room rendering times", new(x, y), Color.White);
-                y += Consolas10.LineSpacing;
-                
-                foreach (var kvp in RoomTimeLogger.Times)
-                {
-                    SpriteBatch.DrawStringShaded(Consolas10, $"{kvp.Key}: {kvp.Value.TotalMilliseconds:0.00}ms", new(x, y), Color.White);
-                    y += Consolas10.LineSpacing;
+                    WorldCamera.DrawRect(r.WorldPos + r.CameraPositions[i] - new Vector2(2) / WorldCamera.Scale, screenTex.Texture.Size() + new Vector2(4) / WorldCamera.Scale, Microsoft.Xna.Framework.Color.White * 0.4f);
                 }
-
-                SpriteBatch.End();
             }
 
-            //base.Draw(gameTime);
+            SpriteBatch.End();
+        }
+
+        private void _SaveRegionRooms(Region Region)
+        {
+            float scale = 1f / Scale;
+            //Scale = RenderRoomTiles ? 1f / 20f : Scale;
+            WorldCamera.Scale = scale;
+
+            if (Directory.Exists("RenderRegion") == false)
+                Directory.CreateDirectory("RenderRegion");
+
+            Rgba32 bg = Region.BackgroundColor is null ? new(0) : new(Region.BackgroundColor.Value.PackedValue);
+            for (int k = 0; k < Region.Rooms.Count; k++)
+            {
+                Room room = Region.Rooms[k];
+                Instance.Window.Title = $"Rendering room {room.Name} ({k}/{Region.Rooms.Count})";
+                Image<Rgba32> capturedRoom = CaptureManager.CaptureRoom(room, bg, scale);
+
+                string fileName = "RenderRegion/" + room.Name + (RenderRoomTiles ? "_tiles" : "") + ".png";
+
+                if (File.Exists(fileName))
+                    File.Delete(fileName);
+
+                using FileStream outputStream = new(fileName, FileMode.CreateNew);
+                capturedRoom.SaveAsync(outputStream, new PngEncoder());
+            }
+            GC.Collect();
+
+            WorldCamera.Scale = 1f;
+        }
+
+        protected void _DrawInfo()
+        {
+            List<string> lines = new()
+            {
+                $"World Camera Scale: " + WorldCamera.Scale,
+                $"Render Scale: {1f / Scale} (1/{Scale})",
+                $"Main rendering time",
+            };
+
+            foreach (var kvp in MainTimeLogger.Times)
+                lines.Add($"{kvp.Key}: {kvp.Value.TotalMilliseconds:0.00}ms");
+
+            lines.Add($"Room rendering times");
+            foreach (var kvp in RoomTimeLogger.Times)
+                lines.Add($"{kvp.Key}: {kvp.Value.TotalMilliseconds:0.00}ms");
+
+            float x = 10;
+            float y = 10;
+            SpriteBatch.Begin();
+            foreach (var line in lines)
+            {
+                SpriteBatch.DrawStringShaded(Consolas10, line, new(x, y), Microsoft.Xna.Framework.Color.White);
+                y += Consolas10.LineSpacing;
+            }
+            SpriteBatch.End();
         }
 
         protected override void EndDraw()
@@ -353,16 +391,21 @@ namespace RainMap
                     rwpath = Path.GetDirectoryName(rwpath);
                 }
 
+
+                string assetsPath = Path.Combine(rwpath, "RainWorld_Data\\StreamingAssets");
+                string palettePath = Path.Combine(rwpath, "RainWorld_Data\\StreamingAssets\\palettes");
+
                 RainWorldDir = rwpath;
-                Noise = Texture2D.FromFile(GraphicsDevice, Path.Combine(rwpath, "Assets\\Futile\\Resources\\Palettes\\noise.png"));
-                EffectColors = Texture2D.FromFile(GraphicsDevice, Path.Combine(rwpath, "Assets\\Futile\\Resources\\Palettes\\effectColors.png"));
-                Palettes.SetPalettePath(Path.Combine(rwpath, "Assets\\Futile\\Resources\\Palettes"));
+                Palettes.SetPalettePath(palettePath);
+
+                Noise = Texture2D.FromFile(GraphicsDevice, palettePath + "\\noise.png");
+                EffectColors = Texture2D.FromFile(GraphicsDevice, palettePath + "\\effectColors.png");
 
                 RoomColor.Parameters["NoiseTex"]?.SetValue(Noise);
                 WaterColor.Parameters["NoiseTex"]?.SetValue(Noise);
                 RoomColor.Parameters["EffectColors"]?.SetValue(EffectColors);
 
-                GameAssets.LoadAssets(Path.Combine(rwpath, "Assets\\Futile\\Resources\\Atlases"));
+                GameAssets.LoadAssets(assetsPath);
 
                 ThreadPool.QueueUserWorkItem((_) =>
                 {
