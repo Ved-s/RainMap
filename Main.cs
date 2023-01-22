@@ -239,9 +239,11 @@ namespace RainMap
             GraphicsDevice.ScissorRectangle = new(0, 0, vp.Width, vp.Height);
             Projection = Matrix.CreateOrthographicOffCenter(0, vp.Width, vp.Height, 0, 0, 1);
 
-_renderRoomsOnScreen(SelectedRooms);
+			GraphicsDevice.Clear(Region?.BackgroundColor ?? Microsoft.Xna.Framework.Color.CornflowerBlue);
 
-            MainTimeLogger.StartWatch(MainDrawTime.Region);
+			_renderRoomsOnScreen(SelectedRooms);
+
+			MainTimeLogger.StartWatch(MainDrawTime.Region);
 
             Region?.Draw(WorldCamera, RenderConnections);
 
