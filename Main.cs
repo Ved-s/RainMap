@@ -216,7 +216,21 @@ namespace RainMap
 
                 }
 
-                if (KeyboardState.IsKeyDown(Keys.F8) && OldKeyboardState.IsKeyDown(Keys.F8) && Region is not null)
+				if (Scale > 1 && KeyboardState.IsKeyDown(Keys.Add) && OldKeyboardState.IsKeyUp(Keys.Add))
+				{
+					Scale -= 1;
+					foreach (Room room in SelectedRooms)
+						room.UpdateScreenSize();
+				}
+
+				if (KeyboardState.IsKeyDown(Keys.Subtract) && OldKeyboardState.IsKeyUp(Keys.Subtract))
+				{
+					Scale += 1;
+					foreach (Room room in SelectedRooms)
+						room.UpdateScreenSize();
+				}
+
+				if (KeyboardState.IsKeyDown(Keys.F8) && OldKeyboardState.IsKeyDown(Keys.F8) && Region is not null)
                     _SaveRegionRooms(Region);
 
                 if (KeyboardState.IsKeyDown(Keys.F9) && OldKeyboardState.IsKeyUp(Keys.F9))
