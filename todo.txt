@@ -4,8 +4,6 @@ Remove region class, move rooms to global place
 Load multiple regions
 Placed objects
 Flat lights
-GUI
-Render steps time display
 Split rendering into layers
 Waterfalls
 Room effects

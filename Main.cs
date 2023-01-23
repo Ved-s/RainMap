@@ -107,6 +107,8 @@ namespace RainMap
             Transparent = new(GraphicsDevice, 1, 1);
             Transparent.SetData(new[] { Microsoft.Xna.Framework.Color.Transparent });
 
+            GameAssets.LoadContent(Content);
+
             PixelEffect = new(GraphicsDevice);
             PixelEffect.Texture = Pixel;
             PixelEffect.TextureEnabled = true;
@@ -370,7 +372,7 @@ namespace RainMap
                 WaterColor.Parameters["NoiseTex"]?.SetValue(Noise);
                 RoomColor.Parameters["EffectColors"]?.SetValue(EffectColors);
 
-                GameAssets.LoadAssets(assetsPath);
+                //GameAssets.LoadAssets(assetsPath);
 
                 ThreadPool.QueueUserWorkItem((_) =>
                 {

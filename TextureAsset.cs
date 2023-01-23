@@ -27,5 +27,14 @@ namespace RainMap
             }
             CompletionAction += callback;
         }
+
+        public void Load(Texture2D texture)
+        {
+            if (Loaded)
+                return;
+
+            Texture = texture;
+            CompletionAction?.Invoke();
+        }
     }
 }
