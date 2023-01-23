@@ -20,6 +20,7 @@ namespace RainMap
 		private RegionProperties? Properties;
 
 		public Color? BackgroundColor;
+		public string Id = null!;
 
 		public static Region Load(string path)
 		{
@@ -27,7 +28,10 @@ namespace RainMap
 
 			Main.Instance.Window.Title = $"Loading region {regionId}";
 
-			Region region = new();
+			Region region = new()
+			{
+				Id = regionId.ToUpper()
+			};
 
 			string[] worldLines = File.ReadAllLines(Path.Combine(path, $"world_{regionId}.txt"));
 
@@ -193,14 +197,14 @@ namespace RainMap
 				room.Update();
 		}
 
-		public void Draw(Renderer renderer, bool isConnecionsDraw)
+		public void Draw(Renderer renderer, bool drawConnections)
 		{
 			Main.RoomTimeLogger.ResetWatches();
 
 			foreach (Room room in Rooms)
 				room.Draw(renderer);
 
-			if (isConnecionsDraw)
+			if (drawConnections)
 			{
 				Main.RoomTimeLogger.StartWatch(RoomDrawTime.RegionConnections);
 				DrawConnections(renderer);

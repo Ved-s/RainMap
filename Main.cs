@@ -53,7 +53,8 @@ namespace RainMap
         public static bool RenderRoomTiles = false;
         public static bool DrawInfo = true;
         public static bool UseParallax = false;
-        public static int Scale = 1;
+
+        public static bool RenderTilesWithPalette = false;
 
         public static string RainWorldDir = null!;
 
@@ -211,28 +212,6 @@ namespace RainMap
             {
                 WorldCamera.Update();
 
-                if (KeyboardState.IsKeyDown(Keys.F7) && OldKeyboardState.IsKeyUp(Keys.F7))
-                {
-
-                }
-
-				if (Scale > 1 && KeyboardState.IsKeyDown(Keys.Add) && OldKeyboardState.IsKeyUp(Keys.Add))
-				{
-					Scale -= 1;
-					foreach (Room room in SelectedRooms)
-						room.UpdateScreenSize();
-				}
-
-				if (KeyboardState.IsKeyDown(Keys.Subtract) && OldKeyboardState.IsKeyUp(Keys.Subtract))
-				{
-					Scale += 1;
-					foreach (Room room in SelectedRooms)
-						room.UpdateScreenSize();
-				}
-
-				if (KeyboardState.IsKeyDown(Keys.F8) && OldKeyboardState.IsKeyDown(Keys.F8) && Region is not null)
-                    _SaveRegionRooms(Region);
-
                 if (KeyboardState.IsKeyDown(Keys.F9) && OldKeyboardState.IsKeyUp(Keys.F9))
                     DrawInfo = !DrawInfo;
             }
@@ -255,7 +234,7 @@ namespace RainMap
 
 			GraphicsDevice.Clear(Region?.BackgroundColor ?? Microsoft.Xna.Framework.Color.CornflowerBlue);
 
-			_renderRoomsOnScreen(SelectedRooms);
+			DrawRoomSelection(SelectedRooms);
 
 			MainTimeLogger.StartWatch(MainDrawTime.Region);
 
@@ -290,10 +269,10 @@ namespace RainMap
             Interface.Draw();
 
             if (DrawInfo)
-                _DrawInfo();
+                DrawTimingInfo();
         }
 
-        private void _renderRoomsOnScreen(HashSet<Room> SelectedRooms)
+        private void DrawRoomSelection(HashSet<Room> SelectedRooms)
         {
             SpriteBatch.Begin();
 
@@ -312,41 +291,11 @@ namespace RainMap
             SpriteBatch.End();
         }
 
-        private void _SaveRegionRooms(Region Region)
-        {
-            float scale = 1f / Scale;
-            //Scale = RenderRoomTiles ? 1f / 20f : Scale;
-            WorldCamera.Scale = scale;
-
-            if (Directory.Exists("RenderRegion") == false)
-                Directory.CreateDirectory("RenderRegion");
-
-            Rgba32 bg = Region.BackgroundColor is null ? new(0) : new(Region.BackgroundColor.Value.PackedValue);
-            for (int k = 0; k < Region.Rooms.Count; k++)
-            {
-                Room room = Region.Rooms[k];
-                Instance.Window.Title = $"Rendering room {room.Name} ({k}/{Region.Rooms.Count})";
-                Image<Rgba32> capturedRoom = CaptureManager.CaptureRoom(room, bg, scale);
-
-                string fileName = "RenderRegion/" + room.Name + (RenderRoomTiles ? "_tiles" : "") + ".png";
-
-                if (File.Exists(fileName))
-                    File.Delete(fileName);
-
-                using FileStream outputStream = new(fileName, FileMode.CreateNew);
-                capturedRoom.SaveAsync(outputStream, new PngEncoder());
-            }
-            GC.Collect();
-
-            WorldCamera.Scale = 1f;
-        }
-
-        protected void _DrawInfo()
+        protected void DrawTimingInfo()
         {
             List<string> lines = new()
             {
-                $"World Camera Scale: " + WorldCamera.Scale,
-                $"Render Scale: {1f / Scale} (1/{Scale})",
+                $"World Camera Scale: {WorldCamera.Scale:0.##}",
                 $"Main rendering time",
             };
 

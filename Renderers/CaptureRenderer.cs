@@ -80,7 +80,7 @@ namespace RainMap.Renderers
             if (Capturing)
             {
                 Vector2 scale = worldSize is null ? Vector2.One : worldSize.Value / new Vector2(texWidth, texHeight);
-                Main.SpriteBatch.Draw(texture, TransformVector(worldPos), source, color ?? Color.White, 0f, Vector2.Zero, scale, SpriteEffects.None, 0);
+                Main.SpriteBatch.Draw(texture, TransformVector(worldPos), source, color ?? Color.White, 0f, Vector2.Zero, scale * Scale, SpriteEffects.None, 0);
                 return;
             }
 

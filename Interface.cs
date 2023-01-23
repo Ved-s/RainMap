@@ -11,182 +11,283 @@ using System.Threading;
 
 namespace RainMap
 {
-    public static class Interface
-    {
-        public static bool Hovered => Root.Hover is not null;
+	public static class Interface
+	{
+		public static bool Hovered => Root.Hover is not null;
 
-        static UIRoot Root;
-        static UIResizeablePanel SidePanel;
+		static UIRoot Root;
+		static UIResizeablePanel SidePanel;
 
-        public static void Init()
-        {
-            Root = new(Main.Instance)
-            {
-                Font = Main.Consolas10,
-                Elements =
-                {
-                    new UIResizeablePanel()
+		static float CaptureScale = 1f;
+
+		public static void Init()
+		{
+			Build();
+			Root.Recalculate();
+
+			Main.Instance.Window.ClientSizeChanged += RootSizeChanged;
+		}
+
+		private static void Build()
+		{
+			Root = new(Main.Instance)
+			{
+				Font = Main.Consolas10,
+				Elements =
+				{
+					new UIResizeablePanel()
+					{
+						Left = new(0, 1, -1),
+
+						Width = 200,
+						Height = new(0, 1),
+						MaxWidth = new(0, 1f),
+						MinWidth = new(80, 0),
+
+						Margin = 5,
+
+						BackColor = Color.Transparent,
+						BorderColor = Color.Transparent,
+
+						CanGrabTop = false,
+						CanGrabRight = false,
+						CanGrabBottom = false,
+						SizingChangesPosition = false,
+
+						Elements =
+						{
+							new TabContainer
+							{
+								Tabs =
+								{
+									new()
+									{
+										Name = "Settings",
+										Element = BuildSettings()
+									}
+								}
+							}
+						}
+					}.Assign(out SidePanel)
+				}
+			};
+		}
+
+		private static UIElement BuildSettings()
+		{
+			return new UIPanel
+			{
+				BackColor = new(30, 30, 30),
+				BorderColor = new(100, 100, 100),
+
+				Padding = new(5),
+
+				Elements =
+				{
+					new UIList
+					{
+						Height = new(-100, 1),
+
+						ElementSpacing = 5,
+						Elements =
+						{
+							new UILabel
+							{
+								Height = 20,
+								Text = "Render layers",
+								TextAlign = new(.5f),
+								Margin = new(5, 0, 0, 0)
+							},
+
+							new UIButton
+							{
+								Height = 18,
+
+								Selectable = true,
+								Selected = Main.RenderRoomLevel,
+								Text = "Room level",
+
+								SelectedBackColor = Color.White,
+								SelectedTextColor = Color.Black,
+
+							}.OnEvent(UIElement.ClickEvent, (btn, _) => Main.RenderRoomLevel = btn.Selected),
+
+							new UIButton
+							{
+								Height = 18,
+
+								Selectable = true,
+								Selected = Main.RenderRoomTiles,
+								Text = "Room tiles",
+
+								SelectedBackColor = Color.White,
+								SelectedTextColor = Color.Black,
+
+							}.OnEvent(UIElement.ClickEvent, (btn, _) => Main.RenderRoomTiles = btn.Selected),
+
+							new UIButton
+							{
+								Height = 18,
+
+								Selectable = true,
+								Selected = Main.RenderConnections,
+								Text = "Room connections",
+
+								SelectedBackColor = Color.White,
+								SelectedTextColor = Color.Black,
+
+							}.OnEvent(UIElement.ClickEvent, (btn, _) => Main.RenderConnections = btn.Selected),
+
+							new UIButton
+							{
+								Height = 18,
+
+								Selectable = true,
+								Selected = Main.UseParallax,
+								Text = "Room parallax effect",
+
+								SelectedBackColor = Color.White,
+								SelectedTextColor = Color.Black,
+
+							}.OnEvent(UIElement.ClickEvent, (btn, _) => Main.UseParallax = btn.Selected),
+
+							new UIElement
+							{
+								Height = 20,
+							},
+
+							new UIButton
+							{
+								Height = 18,
+
+								Selectable = true,
+								Selected = Main.RenderTilesWithPalette,
+								Text = "Render tiles with palette",
+
+								SelectedBackColor = Color.White,
+								SelectedTextColor = Color.Black,
+
+							}.OnEvent(UIElement.ClickEvent, (btn, _) => Main.RenderTilesWithPalette = btn.Selected),
+						}
+					},
+					new UILabel
+					{
+						Height = 18,
+						Width = new(-40, 1),
+
+						Top = new(-78, 1),
+
+						Text = $"Render scale: {CaptureScale:0.00}",
+						TextAlign = new(0, .5f)
+
+					}.Assign(out UILabel scale),
+
+					new UIButton
+					{
+						Height = 18,
+						Width = 18,
+						Top = new(-78, 1),
+						Left = new(-23, 1, -1),
+
+						Text = "+",
+						TextAlign = new(.5f),
+
+                    }.OnEvent(UIElement.ClickEvent, (btn, _) => { CaptureScale *= 2; scale.Text = $"Render scale: {CaptureScale:0.00}"; }),
+
+                    new UIButton
                     {
+                        Height = 18,
+                        Width = 18,
+                        Top = new(-78, 1),
                         Left = new(0, 1, -1),
 
-                        Width = 200,
-                        Height = new(0, 1),
-                        MaxWidth = new(0, 1f),
-                        MinWidth = new(80, 0),
+                        Text = "-",
+						TextAlign = new(.5f),
 
-                        Margin = 5,
+                    }.OnEvent(UIElement.ClickEvent, (btn, _) => { CaptureScale *= .5f; scale.Text = $"Render scale: {CaptureScale:0.00}"; }),
 
-                        BackColor = Color.Transparent,
-                        BorderColor = Color.Transparent,
+                    new UIButton
+                    {
+                        Height = 25,
 
-                        CanGrabTop = false,
-                        CanGrabRight = false,
-                        CanGrabBottom = false,
-                        SizingChangesPosition = false,
+                        Top = new(-55, 1),
+                        TextAlign = new(.5f),
+                        Text = "Render region rooms",
 
-                        Elements =
-                        {
-                            new TabContainer
-                            {
-                                Tabs =
-                                {
-                                    new()
-                                    {
-                                        Name = "Settings",
-                                        Element = new UIPanel
-                                        {
-                                            BackColor = new(30, 30, 30),
-                                            BorderColor = new(100, 100, 100),
+                    }.OnEvent(UIElement.ClickEvent, RenderRegionRoomsClicked),
+                    new UIButton
+					{
+						Height = 25,
 
-                                            Padding = new(5),
+						Top = new(-25, 1),
+						TextAlign = new(.5f),
+						Text = "Render entire region",
 
-                                            Elements =
-                                            {
-                                                new UIList
-                                                {
-                                                    Height = new(-30, 1),
+					}.OnEvent(UIElement.ClickEvent, RenderEntireRegionClicked)
+				}
+			};
+		}
 
-                                                    ElementSpacing = 5,
-                                                    Elements =
-                                                    {
-                                                        new UIButton
-                                                        {
-                                                            Height = 18,
+		private static void RenderRegionRoomsClicked(UIButton button, Empty _)
+		{
+			if (Main.Region is not null)
+				CaptureManager.CaptureRegionRooms(Main.Region, CaptureScale);
+		}
+		private static void RenderEntireRegionClicked(UIButton button, Empty _)
+		{
+            string renderFile = null;
+            Thread thd = new(() =>
+            {
+                System.Windows.Forms.SaveFileDialog sfd = new();
+                sfd.Title = "Select render save file";
+                sfd.Filter = "TIFF Image|*.tiff";
+                if (sfd.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    renderFile = sfd.FileName;
+            });
+            thd.SetApartmentState(ApartmentState.STA);
+            thd.Start();
+            thd.Join();
 
-                                                            Selectable = true,
-                                                            Selected = Main.RenderRoomLevel,
-                                                            Text = "Room level layer",
+            if (renderFile is not null)
+            {
+                var capResult = CaptureManager.CaptureEntireRegion(Main.Region, CaptureScale);
 
-                                                            SelectedBackColor = Color.White,
-                                                            SelectedTextColor = Color.Black,
-
-                                                        }.OnEvent(UIElement.ClickEvent, (btn, _) => Main.RenderRoomLevel = btn.Selected),
-
-                                                        new UIButton
-                                                        {
-                                                            Height = 18,
-
-                                                            Selectable = true,
-                                                            Selected = Main.RenderRoomTiles,
-                                                            Text = "Room tile layer",
-
-                                                            SelectedBackColor = Color.White,
-                                                            SelectedTextColor = Color.Black,
-
-                                                        }.OnEvent(UIElement.ClickEvent, (btn, _) => Main.RenderRoomTiles = btn.Selected),
-
-                                                        new UIButton
-                                                        {
-                                                            Height = 18,
-
-                                                            Selectable = true,
-                                                            Selected = Main.RenderConnections,
-                                                            Text = "Room connections",
-
-                                                            SelectedBackColor = Color.White,
-                                                            SelectedTextColor = Color.Black,
-
-                                                        }.OnEvent(UIElement.ClickEvent, (btn, _) => Main.RenderConnections = btn.Selected),
-
-                                                        new UIButton
-                                                        {
-                                                            Height = 18,
-
-                                                            Selectable = true,
-                                                            Selected = Main.UseParallax,
-                                                            Text = "Room parallax effect",
-
-                                                            SelectedBackColor = Color.White,
-                                                            SelectedTextColor = Color.Black,
-
-                                                        }.OnEvent(UIElement.ClickEvent, (btn, _) => Main.UseParallax = btn.Selected)
-                                                    }
-                                                },
-                                                new UIButton
-                                                {
-                                                    Height = 25,
-
-                                                    Top = new(-25, 1),
-                                                    TextAlign = new(.5f),
-                                                    Text = "Render region",
-
-                                                }.OnEvent(UIElement.ClickEvent, (_, _) =>
-                                                {
-                                                    string renderFile = null;
-                                                    Thread thd = new(() =>
-                                                    {
-                                                        System.Windows.Forms.SaveFileDialog sfd = new();
-                                                        sfd.Title = "Select render save file";
-                                                        sfd.Filter = "TIFF Image|*.tiff";
-                                                        if (sfd.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                                                            renderFile = sfd.FileName;
-                                                    });
-                                                    thd.SetApartmentState(ApartmentState.STA);
-                                                    thd.Start();
-                                                    thd.Join();
-
-                                                    if (renderFile is not null)
-                                                    {
-                                                        var capResult = CaptureManager.CaptureRegion(Main.Region);
-
-                                                        using FileStream fs = File.Create(renderFile);
-                                                        Main.Instance.Window.Title = "Saving region capture";
-                                                        capResult.Save(fs, new SixLabors.ImageSharp.Formats.Tiff.TiffEncoder()
-                                                        {
-                                                            Compression = SixLabors.ImageSharp.Formats.Tiff.Constants.TiffCompression.Deflate,
-                                                        });
-                                                        Main.Instance.Window.Title = "Freeing region capture";
-                                                        capResult.Dispose();
-                                                        GC.Collect();
-                                                    }
-                                                })
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }.Assign(out SidePanel)
-                }
-            };
-            Root.Recalculate();
-
-            Main.Instance.Window.ClientSizeChanged += (_, _) => Root.Recalculate();
+                using FileStream fs = File.Create(renderFile);
+                Main.Instance.Window.Title = "Saving region capture";
+                capResult.Save(fs, new SixLabors.ImageSharp.Formats.Tiff.TiffEncoder()
+                {
+                    Compression = SixLabors.ImageSharp.Formats.Tiff.Constants.TiffCompression.Deflate,
+                });
+                Main.Instance.Window.Title = "Freeing region capture";
+                capResult.Dispose();
+                GC.Collect();
+            }
         }
 
-        public static void Update()
-        {
-            Root.Update();
+		private static void RootSizeChanged(object sender, EventArgs e)
+		{
+			Root.Recalculate();
+		}
 
-            if (Root.GetKeyState(Keys.F1) == KeybindState.JustPressed)
-                SidePanel.Visible = !SidePanel.Visible;
-        }
+		public static void Update()
+		{
+			if (Main.OldKeyboardState.IsKeyUp(Keys.F12) && Main.KeyboardState.IsKeyDown(Keys.F12))
+			{
+				Build();
+				Root.Recalculate();
+			}
 
-        public static void Draw()
-        {
-            Main.SpriteBatch.Begin();
-            Root.Draw(Main.SpriteBatch);
-            Main.SpriteBatch.End();
-        }
-    }
+			Root.Update();
+
+			if (Root.GetKeyState(Keys.F1) == KeybindState.JustPressed)
+				SidePanel.Visible = !SidePanel.Visible;
+		}
+
+		public static void Draw()
+		{
+			Main.SpriteBatch.Begin();
+			Root.Draw(Main.SpriteBatch);
+			Main.SpriteBatch.End();
+		}
+	}
 }
