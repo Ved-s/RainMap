@@ -2,26 +2,12 @@
 
 Tool created to quickly load, preview and render regions.
 
-#### Usage
+### Usage
 
 When started, RainMap will ask to open region folder (for example `Rain World/World/Regions/SU`), then it will try to locate RainWorld.exe and all needed assets then load region rooms.
 
-When all rooms are loaded, you can:
+Then it can be configured in its interface.
 
-- Pan around using right mouse button
-- Zoom using mouse wheel
-- Select and move rooms using right mouse button
+### Download
 
-- Press F3 to switch room connections
-- Press F4 to switch parallax effect (WIP)
-- Press F5 to switch room layer visibility
-- Press F6 to switch room tile layer visibility
-- Press F8 to start region rendering
-
-    RainMap will ask for result file path then start rendering all rooms into single image file
-    
-    All visible layers at the moment os starting the render will be visible in the final render
-
-Debug keys:
-- F7: Reinit some room rendering parameters
-- F9: Show draw timings
+Latest autobuild can be downloaded [here](https://nightly.link/Ved-s/RainMap/workflows/dotnet/master/Build.zip) (powered by nightly.link)
