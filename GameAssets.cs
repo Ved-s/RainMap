@@ -36,6 +36,7 @@ namespace RainMap
                 "SporePlant"        => new(79, 0, 23, 23),
                 "VultureGrub"       => new(59, 64, 20, 17),
                 "WaterNut"          => new(79, 24, 13, 13),
+                "SeedCob"           => new(103, 0, 35, 38),
                 _ => null,
             };
         }
