@@ -16,6 +16,7 @@ namespace RainMap
     public class Room
     {
         static Point[] Directions = new Point[] { new Point(0, -1), new Point(1, 0), new Point(0, 1), new Point(-1, 0) };
+        static RasterizerState Scissors = new() { ScissorTestEnable = true };
 
         public string Name = null!;
         public Point Size;
@@ -384,6 +385,24 @@ namespace RainMap
             if (Main.RenderRoomTiles)
                 DrawScreenTiles(renderer, index, Main.RenderTilesWithPalette);
 
+            if (Main.DrawObjectNames || Main.DrawObjectIcons)
+            {
+                Rectangle oldScissors = Main.Instance.GraphicsDevice.ScissorRectangle;
+                Vector2 tl = renderer.TransformVector(WorldPos + CameraPositions[index]);
+                Vector2 br = renderer.TransformVector(WorldPos + CameraPositions[index] + CameraScreens[index]?.Texture.Size() ?? Vector2.One);
+                Main.Instance.GraphicsDevice.ScissorRectangle = new((int)tl.X, (int)tl.Y, (int)(br.X - tl.X), (int)(br.Y - tl.Y));
+                Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp, rasterizerState: Scissors);
+
+                if (Main.DrawObjectNames)
+                    DrawObjectNames(renderer);
+
+                if (Main.DrawObjectIcons)
+                    DrawObjectIcons(renderer);
+
+                Main.SpriteBatch.End();
+                Main.Instance.GraphicsDevice.ScissorRectangle = oldScissors;
+            }
+
             Main.RoomTimeLogger.FinishWatch();
         }
 
@@ -396,6 +415,9 @@ namespace RainMap
 
             Main.RoomTimeLogger.StartWatch(RoomDrawTime.RoomLevel, true);
 
+            float grabScale1 = Math.Min(1, renderer.Scale);
+            float grabScale2 = Math.Max(1, renderer.Scale);
+
             Main.SpriteBatch.Begin(SpriteSortMode.Immediate, samplerState: SamplerState.PointClamp);
 
             if (Main.RoomColor is not null)
@@ -403,6 +425,7 @@ namespace RainMap
                 Main.RoomColor.Parameters["Projection"]?.SetValue(renderer.Projection);
                 ApplyPaletteToShader(Main.RoomColor, index);
                 ApplyLevelToShader(Main.RoomColor, index, renderer);
+                //GrabBuffer.ApplyToShader(Main.RoomColor);
 
                 if (Settings?.EffectColorA is not null)
                     Main.RoomColor.Parameters["EffectColorA"]?.SetValue(Settings.EffectColorA.Value);
@@ -419,6 +442,28 @@ namespace RainMap
 
             Main.RoomTimeLogger.StartWatch(RoomDrawTime.ObjectLights, true);
             DrawObjectLights(renderer, index);
+
+            //GrabBuffer.Clear();
+            //GrabBuffer.Begin(texture.Texture.Size(), grabScale1, WorldPos + CameraPositions[index]);
+            //Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            //
+            //foreach (Point p in RoomExitEntrances)
+            //{
+            //    Vector2 tileCenter = WorldPos + new Vector2(p.X, p.Y) * 20;
+            //    Vector2 dir = GetShortcutDirection(p.X, p.Y);
+            //    float rotation = dir == Vector2.Zero ? 0f : MathF.Atan2(dir.Y, dir.X);
+            //
+            //    GrabBuffer.Renderer.DrawTexture(GameAssets.Shortcuts.Texture, tileCenter, new(0, 0, 14, 14), null, SamplePalette(1, 7, index), new(.5f), rotation);
+            //    break;
+            //}
+            //
+            //Main.SpriteBatch.End();
+            //GrabBuffer.End();
+
+            Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            renderer.DrawTexture(GrabBuffer.Target!, CameraPositions[index] + WorldPos, GrabBuffer.CurrentSource, texture.Texture.Size(), Color.White, Vector2.One * grabScale2);
+            Main.SpriteBatch.End();
+
             Main.RoomTimeLogger.StartWatch(RoomDrawTime.Water, true);
             DrawWater(renderer, index);
         }
@@ -434,7 +479,6 @@ namespace RainMap
             Main.SpriteBatch.End();
             DrawTileOverlay(renderer, index, applyPalette);
         }
-
 
         public void UpdateScreenSize()
         {
@@ -473,12 +517,16 @@ namespace RainMap
         {
             Point entrance = RoomExitEntrances[index];
 
+            return GetShortcutDirection(entrance.X, entrance.Y);
+        }
+        public Vector2 GetShortcutDirection(int x, int y)
+        {
             Vector2 direction = Vector2.Zero;
 
             for (int i = 0; i < 4; i++)
             {
                 Point dir = Directions[i];
-                Point tilePos = entrance + dir;
+                Point tilePos = new Point(x, y) + dir;
 
                 if (tilePos.X < 0 || tilePos.Y < 0 || tilePos.X >= Size.X || tilePos.Y >= Size.Y)
                     continue;
@@ -488,11 +536,9 @@ namespace RainMap
                     direction -= dir.ToVector2();
             }
 
-            //if (direction == Vector2.Zero)
-            //    Debugger.Break();
-
             return direction;
         }
+
         public Tile GetTile(Point pos) => GetTile(pos.X, pos.Y);
 
         public Tile GetTile(int x, int y)
@@ -717,7 +763,7 @@ namespace RainMap
             {
                 ApplyPaletteToShader(Main.WaterSurface, screenIndex);
                 ApplyLevelToShader(Main.WaterSurface, screenIndex, renderer);
-                //GrabBuffer.ApplyToShader(Main.WaterSurface);
+                GrabBuffer.ApplyToShader(Main.WaterSurface);
                 Main.WaterSurface.Parameters["Projection"].SetValue(roomMatrix);
                 Main.WaterSurface.Parameters["_waterDepth"].SetValue(WaterInFrontOfTerrain ? 0 : 1f / 30);
 
@@ -774,7 +820,7 @@ namespace RainMap
             {
                 ApplyPaletteToShader(Main.WaterColor, screenIndex);
                 ApplyLevelToShader(Main.WaterColor, screenIndex, renderer);
-                //GrabBuffer.ApplyToShader(Main.WaterColor);
+                GrabBuffer.ApplyToShader(Main.WaterColor);
 
                 Main.WaterColor.Parameters["Projection"].SetValue(roomMatrix);
 
@@ -1007,6 +1053,47 @@ namespace RainMap
                             //Main.SpriteBatch.End();
                         }
         }
+        void DrawObjectNames(Renderer renderer)
+        {
+            if (Settings is null) 
+                return;
+
+            foreach (PlacedObject po in Settings.PlacedObjects)
+            {
+                Vector2 fixedPos = po.Position;
+                fixedPos.Y = Size.Y * 20 - fixedPos.Y;
+
+                string? name = po is UnloadedObject unloaded ? unloaded.Id : po.GetType().Name;
+
+                Vector2 pos = renderer.TransformVector(WorldPos + fixedPos);
+                if (!string.IsNullOrEmpty(name))
+                    Main.SpriteBatch.DrawStringAligned(Main.Consolas10, name, pos, Color.White, new(.5f));
+            }
+        }
+        void DrawObjectIcons(Renderer renderer)
+        {
+            if (Settings is null)
+                return;
+
+            foreach (PlacedObject po in Settings.PlacedObjects)
+            {
+                string? name = po is UnloadedObject unloaded ? unloaded.Id : po.GetType().Name;
+                if (name is null)
+                    continue;
+
+                Rectangle? source = GameAssets.GetObjectIconSource(name);
+                if (source is null)
+                    continue;
+
+                Vector2 fixedPos = po.Position;
+                fixedPos.Y = Size.Y * 20 - fixedPos.Y;
+                Vector2 pos = WorldPos + fixedPos;
+
+                Vector2 size = source.Value.Size.ToVector2() * Main.PlacedObjectIconsScale;
+                renderer.DrawTexture(GameAssets.Objects.Texture, pos - size/2, source.Value, size);
+            }
+        }
+
         void DrawLight(Renderer renderer, Texture2D? texture, Vector2 pos, float rad, Color color, int screen)
         {
             LightVertices[0].Position = pos + new Vector2(-rad, -rad);

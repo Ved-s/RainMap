@@ -120,8 +120,7 @@ namespace RainMap
                     case "PlacedObjects":
                         settings.PlacedObjects.Clear();
                         foreach (string podata in split[1].Split(',', StringSplitOptions.TrimEntries))
-                            if (PlacedObject.TryLoadObject(podata, out PlacedObject? po))
-                                settings.PlacedObjects.Add(po);
+                             settings.PlacedObjects.Add(PlacedObject.LoadObject(podata));
                         break;
                 }
             }

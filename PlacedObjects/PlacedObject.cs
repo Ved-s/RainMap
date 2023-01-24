@@ -29,16 +29,13 @@ namespace RainMap.PlacedObjects
                     RegisteredObjects.Add(t.Name, t);
             }
         }
-        public static bool TryLoadObject<T>(string data, [NotNullWhen(true)] out T? @object) where T : PlacedObject
+        public static PlacedObject LoadObject(string data)
         {
             string[] split = data.Split("><", 4);
 
-            @object = null;
-            if (!split.TryGet(0, out string id))
-                return false;
-
-            if (!TryCreateObject(id, out @object))
-                return false;
+            PlacedObject @object;
+            if (!split.TryGet(0, out string id) || !TryCreateObject(id, out @object!))
+                @object = new UnloadedObject { Id = id };
 
             if (split.TryGet(1, out string posxstr) && float.TryParse(posxstr, NumberStyles.Float, CultureInfo.InvariantCulture, out float posx))
                 @object.Position.X = posx;
@@ -50,14 +47,15 @@ namespace RainMap.PlacedObjects
             {
                 PlacedObject? result = @object;
                 @object.LoadData(extra, ref result);
-                if (result is not T)
-                    return false;
-                @object = (T)result;
+                if (result is null)
+                    result = new UnloadedObject { Data = extra, Id = id };
+                
+                @object = result;
             }
 
-            @object?.Initialize();
+            @object.Initialize();
 
-            return @object is not null;
+            return @object;
         }
         public static bool TryCreateObject<T>(string name, [NotNullWhen(true)] out T? @object) where T : PlacedObject
         {

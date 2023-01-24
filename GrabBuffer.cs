@@ -33,7 +33,7 @@ namespace RainMap
             CurrentSize = Vector2.Zero;
         }
 
-        public static void Begin(Vector2 levelSize, float scale, Vector2 translation)
+        public static void Begin(Vector2 levelSize, float scale, Vector2 translation, bool clear = true)
         {
             Translation = translation;
             Scale = scale;
@@ -51,7 +51,8 @@ namespace RainMap
             PreviousTargets = Main.Instance.GraphicsDevice.GetRenderTargets();
 
             Main.Instance.GraphicsDevice.SetRenderTarget(Target);
-            Main.Instance.GraphicsDevice.Clear(Color.Transparent);
+            if (clear)
+                Main.Instance.GraphicsDevice.Clear(Color.Transparent);
         }
 
         public static void End()
@@ -76,7 +77,7 @@ namespace RainMap
 
         public class GrabRenderer : ScreenRenderer
         {
-            public override Vector2 Position => GrabBuffer.Translation;
+            public override Vector2 Position => Translation;
             public override float Scale => GrabBuffer.Scale;
 
             public GrabRenderer() : base(Main.SpriteBatch)

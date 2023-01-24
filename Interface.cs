@@ -86,7 +86,7 @@ namespace RainMap
 				{
 					new UIList
 					{
-						Height = new(-100, 1),
+						Height = new(-200, 1),
 
 						ElementSpacing = 5,
 						Elements =
@@ -130,6 +130,32 @@ namespace RainMap
 								Height = 18,
 
 								Selectable = true,
+								Selected = Main.DrawObjectNames,
+								Text = "Placed object names",
+
+								SelectedBackColor = Color.White,
+								SelectedTextColor = Color.Black,
+
+							}.OnEvent(UIElement.ClickEvent, (btn, _) => Main.DrawObjectNames = btn.Selected),
+
+							new UIButton
+							{
+								Height = 18,
+
+								Selectable = true,
+								Selected = Main.DrawObjectIcons,
+								Text = "Placed object icons",
+
+								SelectedBackColor = Color.White,
+								SelectedTextColor = Color.Black,
+
+							}.OnEvent(UIElement.ClickEvent, (btn, _) => Main.DrawObjectIcons = btn.Selected),
+
+							new UIButton
+							{
+								Height = 18,
+
+								Selectable = true,
 								Selected = Main.RenderConnections,
 								Text = "Room connections",
 
@@ -137,19 +163,6 @@ namespace RainMap
 								SelectedTextColor = Color.Black,
 
 							}.OnEvent(UIElement.ClickEvent, (btn, _) => Main.RenderConnections = btn.Selected),
-
-							new UIButton
-							{
-								Height = 18,
-
-								Selectable = true,
-								Selected = Main.UseParallax,
-								Text = "Room parallax effect",
-
-								SelectedBackColor = Color.White,
-								SelectedTextColor = Color.Black,
-
-							}.OnEvent(UIElement.ClickEvent, (btn, _) => Main.UseParallax = btn.Selected),
 
 							new UIElement
 							{
@@ -168,8 +181,50 @@ namespace RainMap
 								SelectedTextColor = Color.Black,
 
 							}.OnEvent(UIElement.ClickEvent, (btn, _) => Main.RenderTilesWithPalette = btn.Selected),
+
+							new UIButton
+							{
+								Height = 18,
+
+								Selectable = true,
+								Selected = Main.UseParallax,
+								Text = "Room parallax effect",
+
+								SelectedBackColor = Color.White,
+								SelectedTextColor = Color.Black,
+
+							}.OnEvent(UIElement.ClickEvent, (btn, _) => Main.UseParallax = btn.Selected),
 						}
 					},
+
+					new UILabel
+					{
+						Height = 18,
+
+						Top = new(-112, 1),
+
+						Text = $"Object icons scale: {Main.PlacedObjectIconsScale:0.00}",
+						TextAlign = new(0, .5f)
+					}.Assign(out UILabel objScaleLabel),
+					new UIScrollBar
+					{
+						Height = 9,
+						Top = new(-94, 1),
+
+						BarPadding = new(-3, 0),
+						BarSize = 9,
+						BarSizeAbsolute = true,
+						Horizontal = true,
+						ScrollMin = 0.1f,
+						ScrollMax = 4,
+
+						BackColor = new(40, 40, 40),
+					}.OnEvent(UIScrollBar.ScrollChanged, (_, scroll) => 
+					{
+						Main.PlacedObjectIconsScale = scroll;
+						objScaleLabel.Text = $"Object icons scale: {Main.PlacedObjectIconsScale:0.00}";
+                    }),
+
 					new UILabel
 					{
 						Height = 18,

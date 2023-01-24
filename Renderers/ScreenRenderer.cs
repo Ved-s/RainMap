@@ -14,8 +14,11 @@ namespace RainMap.Renderers
             SpriteBatch = spriteBatch;
         }
 
-        public override void DrawTexture(Texture2D texture, Vector2 worldPos, Rectangle? source, Vector2? worldSize, Color? color, Vector2? scaleOverride = null)
+        public void DrawTexture(Texture2D texture, Vector2 worldPos, Rectangle? source, Vector2? worldSize, Color? color, Vector2 origin, float rotation, Vector2? scaleOverride = null)
         {
+            if (texture is null)
+                return;
+
             Vector2 texScale;
             if (scaleOverride.HasValue)
                 texScale = scaleOverride.Value;
@@ -26,7 +29,11 @@ namespace RainMap.Renderers
                 texScale *= Scale;
             }
 
-            SpriteBatch.Draw(texture, TransformVector(worldPos), source, color ?? Color.White, 0f, Vector2.Zero, texScale, SpriteEffects.None, 0);
+            SpriteBatch.Draw(texture, TransformVector(worldPos), source, color ?? Color.White, rotation, origin, texScale, SpriteEffects.None, 0);
+        }
+        public override void DrawTexture(Texture2D texture, Vector2 worldPos, Rectangle? source, Vector2? worldSize, Color? color, Vector2? scaleOverride = null)
+        {
+            DrawTexture(texture, worldPos, source, worldSize, color, Vector2.Zero, 0f, scaleOverride);
         }
 
         public override void DrawRect(Vector2 worldPos, Vector2 size, Color? fill, Color? border = null, float thickness = 1)

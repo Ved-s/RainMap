@@ -76,6 +76,12 @@ namespace RainMap
             }
         }
 
+        public static void DrawStringAligned(this SpriteBatch spriteBatch, SpriteFont spriteFont, string text, Vector2 position, Color color, Vector2 align)
+        {
+            Vector2 size = spriteFont.MeasureString(text);
+            spriteBatch.DrawString(spriteFont, text, position - size * align, color);
+        }
+
         public static void DrawStringShaded(this SpriteBatch spriteBatch, SpriteFont spriteFont, string text, Vector2 position, Color color, Color? shadeColor = null)
         {
             shadeColor ??= Color.Black;

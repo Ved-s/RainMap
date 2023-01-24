@@ -51,8 +51,12 @@ namespace RainMap
         public static bool RenderConnections = true;
         public static bool RenderRoomLevel = true;
         public static bool RenderRoomTiles = false;
+        public static bool DrawObjectNames = false;
+        public static bool DrawObjectIcons = false;
         public static bool DrawInfo = true;
         public static bool UseParallax = false;
+
+        public static float PlacedObjectIconsScale = 1f;
 
         public static bool RenderTilesWithPalette = false;
 
