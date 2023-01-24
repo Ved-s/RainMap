@@ -876,6 +876,9 @@ namespace RainMap
                     Tile tile = GetTile(x, y);
                     bool oob = x < 0 || y < 0 || x >= Size.X || y >= Size.Y;
 
+                    if (tile.Attributes.HasFlag(Tile.TileAttributes.WallBehind))
+                        TriangleDrawing.AddQuad(new(x, y), new(x + 1, y), new(x, y + 1), new(x + 1, y + 1), wallColor * wallAlpha);
+
                     switch (tile.Terrain)
                     {
                         case Tile.TerrainType.Solid:
@@ -956,10 +959,6 @@ namespace RainMap
 
                             case Tile.TileAttributes.HorizontalBeam:
                                 TriangleDrawing.AddQuad(new(x, y + .4f), new(x + 1, y + .4f), new(x, y + .6f), new(x + 1, y + .6f), solidColor * solidAlpha);
-                                break;
-
-                            case Tile.TileAttributes.WallBehind:
-                                TriangleDrawing.AddQuad(new(x, y), new(x + 1, y), new(x, y + 1), new(x + 1, y + 1), wallColor * wallAlpha);
                                 break;
 
                             case Tile.TileAttributes.Hive:
