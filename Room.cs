@@ -1066,8 +1066,16 @@ namespace RainMap
                 string? name = po is UnloadedObject unloaded ? unloaded.Id : po.GetType().Name;
 
                 Vector2 pos = renderer.TransformVector(WorldPos + fixedPos);
+
                 if (!string.IsNullOrEmpty(name))
-                    Main.SpriteBatch.DrawStringAligned(Main.Consolas10, name, pos, Color.White, new(.5f));
+                {
+                    string text = name;
+
+                    if (po is BlueToken token && token.SandboxToken is not null)
+                        text = $"{text} ({token.SandboxToken})";
+
+                    Main.SpriteBatch.DrawStringAligned(Main.Consolas10, text, pos, Color.White, new(.5f));
+                }
             }
         }
         void DrawObjectIcons(Renderer renderer)
@@ -1089,8 +1097,26 @@ namespace RainMap
                 fixedPos.Y = Size.Y * 20 - fixedPos.Y;
                 Vector2 pos = WorldPos + fixedPos;
 
+                Color? color = null;
+
+                if (po is DataPearl pearl)
+                    color = pearl.GetPearlColor();
+
                 Vector2 size = source.Value.Size.ToVector2() * Main.PlacedObjectIconsScale;
-                renderer.DrawTexture(GameAssets.Objects.Texture, pos - size/2, source.Value, size);
+                renderer.DrawTexture(GameAssets.Objects.Texture, pos - size/2, source.Value, size, color);
+
+                if (po is BlueToken token && token.SandboxToken is not null)
+                {
+                    Rectangle? tokenSource = GameAssets.GetObjectIconSource(token.SandboxToken);
+
+                    if (tokenSource is not null)
+                    {
+                        Vector2 tokenSize = tokenSource.Value.Size.ToVector2() * Main.PlacedObjectIconsScale;
+                        Vector2 tokenPos = pos + new Vector2(size.X / 2 - tokenSize.X / 2, size.Y);
+
+                        renderer.DrawTexture(GameAssets.Objects.Texture, tokenPos, tokenSource.Value, tokenSize);
+                    }
+                }
             }
         }
 

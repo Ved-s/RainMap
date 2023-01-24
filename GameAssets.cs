@@ -36,7 +36,14 @@ namespace RainMap
                 "SporePlant"        => new(79, 0, 23, 23),
                 "VultureGrub"       => new(59, 64, 20, 17),
                 "WaterNut"          => new(79, 24, 13, 13),
-                "SeedCob"           => new(103, 0, 35, 38),
+                "SeedCob"           => new(105, 0, 35, 38),
+                "GhostSpot"         => new(87, 39, 38, 48),
+                "BlueToken"         => new(126, 39, 10, 20),
+                "GoldToken"         => new(126, 60, 10, 20),
+                "RedToken"          => new(24, 66, 10, 20),
+                "DataPearl"         => new(93, 24, 11, 10),
+                "UniqueDataPearl"   => new(93, 24, 11, 10),
+                
                 _ => null,
             };
         }
