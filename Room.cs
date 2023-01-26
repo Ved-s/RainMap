@@ -554,8 +554,8 @@ namespace RainMap
 
                     Main.SpriteBatch.Draw(GameAssets.Shortcuts.Texture, tileCenter, source, Color.White, rotation, new(7), renderer.Scale, SpriteEffects.None, 0);
                 }
+                Main.SpriteBatch.End();
             }
-            Main.SpriteBatch.End();
         }
         private void DrawObjectLights(Renderer renderer, int screenIndex)
         {
