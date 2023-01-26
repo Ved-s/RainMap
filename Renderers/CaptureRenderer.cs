@@ -75,6 +75,9 @@ namespace RainMap.Renderers
 
         public override void DrawTexture(Texture2D texture, Vector2 worldPos, Microsoft.Xna.Framework.Rectangle? source = null, Vector2? worldSize = null, Color? color = null, Vector2? scaleOverride = null)
         {
+            if (texture is null)
+                return;
+
             int texWidth = source?.Width ?? texture.Width;
             int texHeight = source?.Height ?? texture.Height;
             if (Capturing)

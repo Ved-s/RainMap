@@ -89,7 +89,7 @@ namespace RainMap
 				roomIndex++;
 			}
 
-			List<(Room, int, int)> roomConnections = new();
+			List<RoomConnection> roomConnections = new();
 			foreach (var kvp in connections)
 			{
 				if (!region.TryGetRoom(kvp.Key, out Room? source))
@@ -111,7 +111,7 @@ namespace RainMap
 					if (index < 0)
 						continue;
 
-					roomConnections.Add((destination, i, index));
+					roomConnections.Add(new(destination, i, index));
 				}
 
 				source.Connections = roomConnections.ToArray();
@@ -235,8 +235,8 @@ namespace RainMap
 					if (DrawnRoomConnections.Contains(connection.Target.Name) || !room.Rendered && !connection.Target.Rendered)
 						continue;
 
-					Vector2 start = room.RoomExitEntrances[connection.Exit].ToVector2() * 20 + new Vector2(10) + room.WorldPos;
-					Vector2 end = connection.Target.RoomExitEntrances[connection.TargetExit].ToVector2() * 20 + new Vector2(10) + connection.Target.WorldPos;
+					Vector2 start = room.RoomExits[connection.Exit].ToVector2() * 20 + new Vector2(10) + room.WorldPos;
+					Vector2 end = connection.Target.RoomExits[connection.TargetExit].ToVector2() * 20 + new Vector2(10) + connection.Target.WorldPos;
 
 					float maxDist = (start - end).Length() / 2;
 

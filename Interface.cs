@@ -201,7 +201,7 @@ namespace RainMap
 					{
 						Height = 18,
 
-						Top = new(-112, 1),
+						Top = new(-142, 1),
 
 						Text = $"Object icons scale: {Main.PlacedObjectIconsScale:0.00}",
 						TextAlign = new(0, .5f)
@@ -209,7 +209,7 @@ namespace RainMap
 					new UIScrollBar
 					{
 						Height = 9,
-						Top = new(-94, 1),
+						Top = new(-124, 1),
 
 						BarPadding = new(-3, 0),
 						BarSize = 9,
@@ -230,7 +230,7 @@ namespace RainMap
 						Height = 18,
 						Width = new(-40, 1),
 
-						Top = new(-78, 1),
+						Top = new(-108, 1),
 
 						Text = $"Render scale: {CaptureScale:0.00}",
 						TextAlign = new(0, .5f)
@@ -241,7 +241,7 @@ namespace RainMap
 					{
 						Height = 18,
 						Width = 18,
-						Top = new(-78, 1),
+						Top = new(-108, 1),
 						Left = new(-23, 1, -1),
 
 						Text = "+",
@@ -253,7 +253,7 @@ namespace RainMap
                     {
                         Height = 18,
                         Width = 18,
-                        Top = new(-78, 1),
+                        Top = new(-108, 1),
                         Left = new(0, 1, -1),
 
                         Text = "-",
@@ -265,11 +265,20 @@ namespace RainMap
                     {
                         Height = 25,
 
-                        Top = new(-55, 1),
+                        Top = new(-85, 1),
                         TextAlign = new(.5f),
                         Text = "Render region rooms",
 
                     }.OnEvent(UIElement.ClickEvent, RenderRegionRoomsClicked),
+                    new UIButton
+                    {
+                        Height = 25,
+
+                        Top = new(-55, 1),
+                        TextAlign = new(.5f),
+                        Text = "Render region room tiles",
+
+                    }.OnEvent(UIElement.ClickEvent, RenderRegionRoomTilesClicked),
                     new UIButton
 					{
 						Height = 25,
@@ -286,9 +295,14 @@ namespace RainMap
 		private static void RenderRegionRoomsClicked(UIButton button, Empty _)
 		{
 			if (Main.Region is not null)
-				CaptureManager.CaptureRegionRooms(Main.Region, CaptureScale);
+				CaptureManager.CaptureRegionRooms(Main.Region, CaptureScale, false);
 		}
-		private static void RenderEntireRegionClicked(UIButton button, Empty _)
+        private static void RenderRegionRoomTilesClicked(UIButton button, Empty _)
+        {
+            if (Main.Region is not null)
+                CaptureManager.CaptureRegionRooms(Main.Region, CaptureScale, true);
+        }
+        private static void RenderEntireRegionClicked(UIButton button, Empty _)
 		{
             string renderFile = null;
             Thread thd = new(() =>

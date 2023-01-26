@@ -1,5 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using RainMap.Renderers;
+using RainMap.Structures;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
@@ -74,9 +75,9 @@ namespace RainMap
             return image;
         }
 
-        public static void CaptureRegionRooms(Region region, float scale)
+        public static void CaptureRegionRooms(Region region, float scale, bool tiles)
         {
-            string dir = $"RegionRender_{region.Id}";
+            string dir = tiles ? $"RegionRender_{region.Id}_tiles" : $"RegionRender_{region.Id}";
 
             Directory.CreateDirectory(dir);
 
@@ -85,9 +86,9 @@ namespace RainMap
             {
                 Room room = region.Rooms[k];
                 Main.Instance.Window.Title = $"Rendering room {room.Name} ({k}/{region.Rooms.Count})";
-                Image<Rgba32> capturedRoom = CaptureRoom(room, bg, scale);
+                Image<Rgba32> capturedRoom = tiles ? CaptureRoomTiles(room) : CaptureRoom(room, bg, scale);
 
-                string fileName = $"{room.Name}{(Main.RenderRoomTiles ? "_tiles" : "")}.png";
+                string fileName = $"{room.Name}{(Main.RenderRoomTiles && !tiles ? "_tiles" : "")}.png";
                 string filePath = Path.Combine(dir, fileName);
 
                 using FileStream outputStream = File.Create(filePath);
@@ -122,6 +123,40 @@ namespace RainMap
             room.Rendered = true;
 
             renderer.Dispose();
+            return image;
+        }
+
+        public static Image<Rgba32> CaptureRoomTiles(Room room)
+        {
+            Image<Rgba32> image = new(room.Size.X, room.Size.Y);
+
+            for (int j = 0; j < room.Size.Y; j++)
+                for (int i = 0; i < room.Size.X; i++)
+                {
+                    Tile tile = room.GetTile(i, j);
+
+                    float gray = 1;
+
+                    if (tile.Terrain == Tile.TerrainType.Solid)
+                        gray = 0;
+                    
+                    if (tile.Terrain == Tile.TerrainType.Floor)
+                        gray = 0.35f;
+
+                    if (tile.Attributes.HasFlag(Tile.TileAttributes.WallBehind))
+                        gray = 0.75f;
+
+                    if (tile.Attributes.HasFlag(Tile.TileAttributes.VerticalBeam) || tile.Attributes.HasFlag(Tile.TileAttributes.HorizontalBeam))
+                        gray = 0.35f;
+
+                    byte b = (byte)(gray * 255);
+
+                    image[i, j] = new(b, b, b);
+                }
+
+            foreach (Microsoft.Xna.Framework.Point p in room.RoomExits)
+                image[p.X, p.Y] = new(255, 0, 0);
+
             return image;
         }
     }
