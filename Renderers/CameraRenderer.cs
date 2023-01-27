@@ -14,6 +14,9 @@ namespace RainMap.Renderers
         private int WheelValue;
         private float WheelZoom;
 
+        const float MaxZoom = 300;
+        const float MinZoom = -500;
+
         public CameraRenderer(SpriteBatch spriteBatch) : base(spriteBatch)
         {
         }
@@ -35,6 +38,12 @@ namespace RainMap.Renderers
                 return;
 
             WheelZoom += Math.Sign(wheel) * (float)Math.Pow(2, Math.Abs(wheel));
+
+            if (WheelZoom > MaxZoom)
+                WheelZoom = MaxZoom;
+
+            if (WheelZoom < MinZoom)
+                WheelZoom = MinZoom;
 
             float zoom = WheelZoom < 0 ? -1 / (0.2f * WheelZoom - 1) : 0.2f * WheelZoom + 1;
             SetScale(zoom, screenPos);
