@@ -367,7 +367,7 @@ namespace RainMap
                 string palettePath = Path.Combine(rwpath, "RainWorld_Data\\StreamingAssets\\palettes");
 
                 RainWorldDir = rwpath;
-                Palettes.SetPalettePath(palettePath);
+                Palettes.SearchPalettes(assetsPath);
 
                 Noise = Texture2D.FromFile(GraphicsDevice, palettePath + "\\noise.png");
                 EffectColors = Texture2D.FromFile(GraphicsDevice, palettePath + "\\effectColors.png");
