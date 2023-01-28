@@ -137,7 +137,9 @@ namespace RainMap
 
                     float gray = 1;
 
-                    if (tile.Terrain == Tile.TerrainType.Solid)
+                    bool solid = tile.Terrain == Tile.TerrainType.Solid;
+
+                    if (solid)
                         gray = 0;
                     
                     if (tile.Terrain == Tile.TerrainType.Floor)
@@ -151,7 +153,21 @@ namespace RainMap
 
                     byte b = (byte)(gray * 255);
 
-                    image[i, j] = new(b, b, b);
+                    Rgba32 color = new(b, b, b);
+
+                    if ((room.WaterInFrontOfTerrain || !solid) && j >= room.Size.Y - room.WaterLevel)
+                    {
+                        Rgba32 waterColor = new(0, 0, 200, 100);
+
+                        float v = waterColor.A / 255f;
+                        float uv = 1 - v;
+
+                        color.R = (byte)(uv * color.R + v * waterColor.R);
+                        color.G = (byte)(uv * color.G + v * waterColor.G);
+                        color.B = (byte)(uv * color.B + v * waterColor.B);
+                    }
+
+                    image[i, j] = color;
                 }
 
             foreach (Microsoft.Xna.Framework.Point p in room.RoomExits)
