@@ -82,6 +82,8 @@ namespace RainMap.UI.Elements
             }
         }
 
+        public virtual string? HoverText { get; set; }
+
         public virtual bool CanActivate { get; set; } = true;
         public Vec2 RelativeMouse => Root is null ? Vec2.Zero : Root.MousePosition - ScreenRect.Position;
 

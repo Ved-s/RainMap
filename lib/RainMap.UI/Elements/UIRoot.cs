@@ -105,6 +105,22 @@ namespace RainMap.UI.Elements
         }
         protected override void PostDrawChildren(SpriteBatch spriteBatch)
         {
+            string? hoverText = Hover?.HoverText;
+
+            if (hoverText is not null && Font is not null)
+            {
+                Vec2 hoverTextSize = (Vec2)Font.MeasureString(hoverText);
+                Vec2 pos = MousePosition;
+
+                Vec2 maxPos = ScreenRect.Size - hoverTextSize;
+                if (pos.Y > maxPos.Y)
+                    pos.Y = maxPos.Y;
+                if (pos.X > maxPos.X)
+                    pos.X = maxPos.X;
+
+                spriteBatch.DrawStringShaded(Font, hoverText, pos, Color.White, Color.Black);
+            }
+
             if (!DebugMode)
                 return;
 

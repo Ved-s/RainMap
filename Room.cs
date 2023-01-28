@@ -876,7 +876,7 @@ namespace RainMap
             float vertSkipCounter = 0;
 
             float pixLoss = 1 / renderer.Scale;
-            if (pixLoss > 0)
+            if (pixLoss > 1)
                 vertSkip = pixLoss / WaterData.TriangleSize;
 
             int vertexIndex = 0;
@@ -951,11 +951,12 @@ namespace RainMap
                 GrabBuffer.ApplyToShader(Main.WaterSurface);
                 Main.WaterSurface.Parameters["Projection"].SetValue(roomMatrix);
                 Main.WaterSurface.Parameters["_waterDepth"].SetValue(WaterInFrontOfTerrain ? 0 : 1f / 30);
-
-                Main.Instance.GraphicsDevice.SamplerStates[0] = SamplerState.PointClamp;
+                
+                Main.Instance.GraphicsDevice.SamplerStates[0] = SamplerState.PointWrap;
                 Main.WaterSurface.CurrentTechnique.Passes[0].Apply();
                 Main.Instance.GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, Water.Vertices, 0, vertexIndex - 2);
             }
+
             vertSkipCounter = 0;
             vertexIndex = 0;
 
@@ -1008,12 +1009,6 @@ namespace RainMap
                 GrabBuffer.ApplyToShader(Main.WaterColor);
 
                 Main.WaterColor.Parameters["Projection"].SetValue(roomMatrix);
-
-                //Vector2 spriteSize = screensize * PanNZoom.Zoom;
-
-                // For some reason, on-screen sprite position is flipped in shader here if not capturing
-                //if (!forCapture)
-                //    spriteSize *= new Vector2(1, -1);
 
                 Main.WaterColor.Parameters["_screenOff"].SetValue(CameraPositions[screenIndex] / (Main.Noise?.Bounds.Size.ToVector2() ?? Vector2.One));
                 Main.WaterColor.Parameters["_screenSize"].SetValue(screensize);

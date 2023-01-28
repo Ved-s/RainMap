@@ -21,7 +21,10 @@ namespace RainMap
             {
                 if (LoadThread is null)
                 {
-                    LoadThread = new(LoadMethod);
+                    LoadThread = new(LoadMethod)
+                    {
+                        Name = "Async texture loader"
+                    };
                     LoadThread.Start();
                 }
 

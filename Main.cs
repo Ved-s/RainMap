@@ -126,7 +126,7 @@ namespace RainMap
             Thread dirSelect = new(() =>
             {
                 System.Windows.Forms.FolderBrowserDialog fd = new();
-                fd.Description = "Select Rain World region";
+                fd.Description = "Select Rain World region folder. For example RainWorld_Data/StreamingAssets/world/su";
                 if (fd.ShowDialog() != System.Windows.Forms.DialogResult.OK)
                     Exit();
 
