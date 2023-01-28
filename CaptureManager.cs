@@ -75,7 +75,7 @@ namespace RainMap
             return image;
         }
 
-        public static void CaptureRegionRooms(Region region, float scale, bool tiles)
+        public static void CaptureRegionRooms(Region region, float scale, bool tiles, bool tileWalls)
         {
             string dir = tiles ? $"RegionRender_{region.Id}_tiles" : $"RegionRender_{region.Id}";
 
@@ -86,7 +86,7 @@ namespace RainMap
             {
                 Room room = region.Rooms[k];
                 Main.Instance.Window.Title = $"Rendering room {room.Name} ({k}/{region.Rooms.Count})";
-                Image<Rgba32> capturedRoom = tiles ? CaptureRoomTiles(room) : CaptureRoom(room, bg, scale);
+                Image<Rgba32> capturedRoom = tiles ? CaptureRoomTiles(room, tileWalls) : CaptureRoom(room, bg, scale);
 
                 string fileName = $"{room.Name}{(Main.RenderRoomTiles && !tiles ? "_tiles" : "")}.png";
                 string filePath = Path.Combine(dir, fileName);
@@ -126,7 +126,7 @@ namespace RainMap
             return image;
         }
 
-        public static Image<Rgba32> CaptureRoomTiles(Room room)
+        public static Image<Rgba32> CaptureRoomTiles(Room room, bool walls)
         {
             Image<Rgba32> image = new(room.Size.X, room.Size.Y);
 
@@ -143,7 +143,7 @@ namespace RainMap
                     if (tile.Terrain == Tile.TerrainType.Floor)
                         gray = 0.35f;
 
-                    if (tile.Attributes.HasFlag(Tile.TileAttributes.WallBehind))
+                    if (walls && tile.Attributes.HasFlag(Tile.TileAttributes.WallBehind))
                         gray = 0.75f;
 
                     if (tile.Attributes.HasFlag(Tile.TileAttributes.VerticalBeam) || tile.Attributes.HasFlag(Tile.TileAttributes.HorizontalBeam))

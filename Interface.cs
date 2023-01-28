@@ -19,6 +19,7 @@ namespace RainMap
         static UIResizeablePanel SidePanel;
 
         static float CaptureScale = 1f;
+        static bool RenderTileWalls = true;
 
         public static void Init()
         {
@@ -93,7 +94,7 @@ namespace RainMap
                     {
                         Text =
                         "Left mouse click and drag - room selection and moving\n\n" +
-                        "Right mouse click and drag - move camear around\n\n" +
+                        "Right mouse click and drag - move camera around\n\n" +
                         "Mouse scroll - zoom\n\n"
                     }
                 }
@@ -232,6 +233,21 @@ namespace RainMap
                                 SelectedTextColor = Color.Black,
 
                             }.OnEvent(UIElement.ClickEvent, (btn, _) => Main.UseParallax = btn.Selected),
+
+                            new UIButton
+                            {
+                                Height = 18,
+
+                                Selectable = true,
+                                Selected = RenderTileWalls,
+                                Text = "Render tile walls",
+
+                                HoverText = "Render room tiles with walls",
+
+                                SelectedBackColor = Color.White,
+                                SelectedTextColor = Color.Black,
+
+                            }.OnEvent(UIElement.ClickEvent, (btn, _) => RenderTileWalls = btn.Selected),
                         }
                     },
 
@@ -336,12 +352,12 @@ namespace RainMap
         private static void RenderRegionRoomsClicked(UIButton button, Empty _)
         {
             if (Main.Region is not null)
-                CaptureManager.CaptureRegionRooms(Main.Region, CaptureScale, false);
+                CaptureManager.CaptureRegionRooms(Main.Region, CaptureScale, false, true);
         }
         private static void RenderRegionRoomTilesClicked(UIButton button, Empty _)
         {
             if (Main.Region is not null)
-                CaptureManager.CaptureRegionRooms(Main.Region, CaptureScale, true);
+                CaptureManager.CaptureRegionRooms(Main.Region, CaptureScale, true, RenderTileWalls);
         }
         private static void RenderEntireRegionClicked(UIButton button, Empty _)
         {
