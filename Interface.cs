@@ -3,11 +3,10 @@ using Microsoft.Xna.Framework.Input;
 using RainMap.UI;
 using RainMap.UI.Elements;
 using RainMap.UI.Structures;
+using RWAPI;
 using System;
 using System.IO;
 using System.Threading;
-
-#nullable disable
 
 namespace RainMap
 {
@@ -15,21 +14,127 @@ namespace RainMap
     {
         public static bool Hovered => Root.Hover is not null;
 
-        static UIRoot Root;
-        static UIResizeablePanel SidePanel;
+        static UIRoot Root = null!;
+        static UIResizeablePanel SidePanel = null!;
 
         static float CaptureScale = 1f;
         static bool RenderTileWalls = true;
 
+        public static InterfacePage Page = InterfacePage.RegionSelect;
+
         public static void Init()
         {
             Build();
-            Root.Recalculate();
-
             Main.Instance.Window.ClientSizeChanged += RootSizeChanged;
         }
 
         private static void Build()
+        {
+            switch (Page)
+            {
+                case InterfacePage.RegionSelect:
+                    BuildRegionSelect();
+                    break;
+
+                case InterfacePage.Main:
+                    BuildMain();
+                    break;
+            }
+            Root.Recalculate();
+        }
+        private static void BuildRegionSelect()
+        {
+            Root = new(Main.Instance)
+            {
+                Font = Main.Consolas10,
+                Elements =
+                {
+                    new UIPanel()
+                    {
+                        Top = new(0, .5f, -.5f),
+                        Left = new(0, .5f, -.5f),
+
+                        Width = 300,
+                        Height = new(0, .9f),
+
+                        Margin = 5,
+                        Padding = new(5, 40),
+
+                        Elements =
+                        {
+                            new UILabel()
+                            {
+                                Top = 10,
+                                Height = 20,
+
+                                Text = "Select region",
+                                TextAlign = new(.5f)
+                            },
+                            new UIList()
+                            {
+                                Top = 40,
+                                Height = new(-100, 1),
+                                ElementSpacing = 5,
+
+                            }.Execute(list =>
+                            {
+                                foreach (RegionData region in RainWorldAPI.EnumerateRegions())
+                                {
+                                    string? name = region.DisplayName ?? region.Id;
+                                    if (name is null)
+                                        continue;
+
+                                    list.Elements.Add(new UIButton
+                                    {
+                                        Text = name,
+                                        Height = 20,
+                                        TextAlign = new(.5f)
+                                    }.OnEvent(UIElement.ClickEvent, (_, _) =>
+                                    {
+                                        Page = InterfacePage.Main;
+                                        Build();
+                                        ThreadPool.QueueUserWorkItem((_) => Main.Instance.LoadRegion(region.Path, region.Id!));
+                                    }));
+                                }
+
+                                list.Recalculate();
+                            }),
+
+                            new UIButton ()
+                            {
+                                Top = new(-50, 1),
+
+                                Height = 20,
+                                Text = "Manual select",
+                                TextAlign = new(.5f)
+
+                            }.OnEvent(UIElement.ClickEvent, (_, _) =>
+                            {
+                                Thread dirSelect = new(() =>
+                                {
+                                    System.Windows.Forms.FolderBrowserDialog fd = new();
+                                    fd.UseDescriptionForTitle = true;
+                                    fd.Description = "Select Rain World region folder. For example RainWorld_Data/StreamingAssets/world/su";
+                                    if (fd.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                                        return;
+
+                                    string id = Path.GetFileName(fd.SelectedPath);
+                                    MultiDirectory dir = new(new[] { fd.SelectedPath });
+
+                                    Page = InterfacePage.Main;
+                                    Build();
+                                    ThreadPool.QueueUserWorkItem((_) => Main.Instance.LoadRegion(dir, id));
+                                });
+                                dirSelect.SetApartmentState(ApartmentState.STA);
+                                dirSelect.Start();
+                                dirSelect.Join();
+                            })
+                        }
+                    }
+                }
+            };
+        }
+        private static void BuildMain()
         {
             Root = new(Main.Instance)
             {
@@ -390,7 +495,7 @@ namespace RainMap
             }
         }
 
-        private static void RootSizeChanged(object sender, EventArgs e)
+        private static void RootSizeChanged(object? sender, EventArgs e)
         {
             Root.Recalculate();
         }
@@ -414,6 +519,12 @@ namespace RainMap
             Main.SpriteBatch.Begin();
             Root.Draw(Main.SpriteBatch);
             Main.SpriteBatch.End();
+        }
+
+        public enum InterfacePage
+        {
+            RegionSelect,
+            Main
         }
     }
 }

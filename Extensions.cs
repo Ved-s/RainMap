@@ -1,5 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using RWAPI;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -96,6 +97,15 @@ namespace RainMap
         public static void DrawPoint(this SpriteBatch spriteBatch, Vector2 pos, float size, Color color)
         {
             spriteBatch.DrawRect(pos - new Vector2(size/2), new Vector2(size), color);
+        }
+
+        public static Texture2D? FindTexture(this MultiDirectory dir, string path)
+        {
+            string? fullPath = dir.FindFile(path);
+            if (fullPath is null)
+                return null;
+
+            return Texture2D.FromFile(Main.Instance.GraphicsDevice, fullPath);
         }
     }
 }

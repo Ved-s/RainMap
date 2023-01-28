@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using RainMap.Renderers;
 using RainMap.Structures;
+using RWAPI;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
@@ -59,8 +60,6 @@ namespace RainMap
         public static float PlacedObjectIconsScale = 1f;
 
         public static bool RenderTilesWithPalette = false;
-
-        public static string RainWorldDir = null!;
 
         public static TimeLogger<MainDrawTime> MainTimeLogger = new();
         public static TimeLogger<RoomDrawTime> RoomTimeLogger = new();
@@ -121,20 +120,24 @@ namespace RainMap
             RoomColor.Parameters["GrabTex"]?.SetValue(Transparent);
             WaterColor.Parameters["GrabTexture"]?.SetValue(Transparent);
 
-            Interface.Init();
-
-            Thread dirSelect = new(() =>
+            if (!RainWorldAPI.SearchRainWorld())
             {
-                System.Windows.Forms.FolderBrowserDialog fd = new();
-                fd.UseDescriptionForTitle = true;
-                fd.Description = "Select Rain World region folder. For example RainWorld_Data/StreamingAssets/world/su";
-                if (fd.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                    Exit();
+                Thread rwSelect = new(() =>
+                {
+                    System.Windows.Forms.OpenFileDialog fd = new();
+                    fd.Filter = "Executable (.exe)|*.exe";
+                    fd.Title = "Select Rain World main executable.";
+                    if (fd.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                        Exit();
 
-                LoadRegion(fd.SelectedPath);
-            });
-            dirSelect.SetApartmentState(ApartmentState.STA);
-            dirSelect.Start();
+                    RainWorldAPI.SetRainWorldRoot(Path.GetDirectoryName(fd.FileName)!);
+                });
+                rwSelect.SetApartmentState(ApartmentState.STA);
+                rwSelect.Start();
+                rwSelect.Join();
+            }
+
+            Interface.Init();
         }
 
         protected override void Update(GameTime gameTime)
@@ -346,44 +349,23 @@ namespace RainMap
             TextureLoader.Finish();
         }
 
-        public void LoadRegion(string path)
+        public void LoadRegion(MultiDirectory path, string id)
         {
             Region = null;
             try
             {
-                string? rwpath = path;
-                while (true)
-                {
-                    if (rwpath is null)
-                        throw new Exception("Could not find RainWorld.exe");
-
-                    if (File.Exists(Path.Combine(rwpath, "RainWorld.exe")))
-                        break;
-
-                    rwpath = Path.GetDirectoryName(rwpath);
-                }
-
-
-                string assetsPath = Path.Combine(rwpath, "RainWorld_Data\\StreamingAssets");
-                string palettePath = Path.Combine(rwpath, "RainWorld_Data\\StreamingAssets\\palettes");
-
-                RainWorldDir = rwpath;
-                Palettes.SearchPalettes(assetsPath);
-
-                Noise = Texture2D.FromFile(GraphicsDevice, palettePath + "\\noise.png");
-                EffectColors = Texture2D.FromFile(GraphicsDevice, palettePath + "\\effectColors.png");
+                Noise = RainWorldAPI.Assets?.FindTexture("palettes/noise.png");
+                EffectColors = RainWorldAPI.Assets?.FindTexture("palettes/effectColors.png");
 
                 RoomColor.Parameters["NoiseTex"]?.SetValue(Noise);
                 WaterColor.Parameters["NoiseTex"]?.SetValue(Noise);
                 RoomColor.Parameters["EffectColors"]?.SetValue(EffectColors);
 
-                //GameAssets.LoadAssets(assetsPath);
-
                 ThreadPool.QueueUserWorkItem((_) =>
                 {
                     try
                     {
-                        Region = Region.Load(path);
+                        Region = Region.Load(path, id);
                     }
                     catch (Exception ex)
                     {

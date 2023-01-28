@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using RainMap.PlacedObjects;
 using RainMap.Renderers;
 using RainMap.Structures;
+using RWAPI;
 using SixLabors.Fonts;
 using System;
 using System.Buffers;
@@ -61,15 +62,18 @@ namespace RainMap
 
         public static Room CurrentRoom = null!;
 
-        public static Room Load(string roomPath)
+        public static Room Load(MultiDirectory dir, string name)
         {
             Room room = new();
+
+            string roomPath = dir.FindFile($"{name}.txt")!;
+
             room.FilePath = roomPath;
 
             string[] lines = File.ReadAllLines(roomPath);
 
-            if (lines.TryGet(0, out string name))
-                room.Name = name;
+            if (lines.TryGet(0, out string displayname))
+                room.Name = displayname;
 
             if (lines.TryGet(1, out string sizeWater))
             {
@@ -242,15 +246,15 @@ namespace RainMap
             room.CameraScreens = new TextureAsset[room.CameraPositions.Length];
             if (room.CameraScreens.Length == 1)
             {
-                string screenFile = Path.Combine(roomDir, $"{roomName}.png");
-                if (File.Exists(screenFile))
+                string? screenFile = dir.FindFile($"{roomName}.png");
+                if (screenFile is not null)
                     room.CameraScreens[0] = TextureLoader.Load(screenFile);
 
             }
             for (int i = 0; i < room.CameraPositions.Length; i++)
             {
-                string screenFile = Path.Combine(roomDir, $"{roomName}_{i + 1}.png");
-                if (File.Exists(screenFile))
+                string? screenFile = dir.FindFile($"{roomName}_{i + 1}.png");
+                if (screenFile is not null)
                     room.CameraScreens[i] = TextureLoader.Load(screenFile);
             }
 
@@ -355,76 +359,81 @@ namespace RainMap
             if (Water is null || Main.KeyboardState.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.P))
                 return;
 
-            float r = 1 * 0.0045f / (0.0005f * WaterData.TriangleSize);
-            float waveAmp = MathHelper.Lerp(1f, 40f, Settings?.WaveAmplitude ?? 0);
-            float waveLength = MathHelper.Lerp(50f, 750f, Settings?.WaveLength ?? 0);
-            float waveSpeed = MathHelper.Lerp(-0.033333335f, 0.033333335f, Settings?.WaveSpeed ?? 0);
-            float rollBackLength = MathHelper.Lerp(2f, 0f, Settings?.SecondWaveLength ?? 0);
-            float rollBackAmp = Settings?.SecondWaveAmplitude ?? 0;
-
-            Water.SinCounter -= waveSpeed * .5f;
-
-            float num7 = 0f;
-            for (int num8 = 0; num8 < Water.Surface.GetLength(0); num8++)
+            try
             {
-                WaterData.SurfacePoint point = Water.Surface[num8, 0];
-                if (num8 == 0)
+                float r = 1 * 0.0045f / (0.0005f * WaterData.TriangleSize);
+                float waveAmp = MathHelper.Lerp(1f, 40f, Settings?.WaveAmplitude ?? 0);
+                float waveLength = MathHelper.Lerp(50f, 750f, Settings?.WaveLength ?? 0);
+                float waveSpeed = MathHelper.Lerp(-0.033333335f, 0.033333335f, Settings?.WaveSpeed ?? 0);
+                float rollBackLength = MathHelper.Lerp(2f, 0f, Settings?.SecondWaveLength ?? 0);
+                float rollBackAmp = Settings?.SecondWaveAmplitude ?? 0;
+
+                Water.SinCounter -= waveSpeed * .5f;
+
+                float num7 = 0f;
+                for (int num8 = 0; num8 < Water.Surface.GetLength(0); num8++)
                 {
-                    point.nextHeight = (2f * point.height + (r - 1f) * point.lastHeight + 2f * (float)Math.Pow(r, 2f) * (Water.Surface[num8 + 1, 0].height - point.height)) / (1f + r);
-                }
-                else if (num8 == Water.Surface.GetLength(0) - 1)
-                {
-                    point.nextHeight = (2f * point.height + (r - 1f) * point.lastHeight + 2f * (float)Math.Pow(r, 2f) * (Water.Surface[num8 - 1, 0].height - point.height)) / (1f + r);
-                }
-                else
-                {
-                    point.nextHeight = (float)Math.Pow(r, 2f) * (Water.Surface[num8 - 1, 0].height + Water.Surface[num8 + 1, 0].height) + 2f * (1f - (float)Math.Pow(r, 2f)) * point.height - point.lastHeight;
-                    //if (this.room.GetTile(point.defaultPos + new Vector2(0f, point.height)).Terrain == Room.Tile.TerrainType.Solid)
-                    //{
-                    //    point.nextHeight *= ((!this.room.waterInFrontOfTerrain) ? 0.75f : 0.95f);
-                    //}
-                }
-                point.nextHeight += MathHelper.Lerp(-waveAmp, waveAmp, (float)Random.Shared.NextDouble()) * 0.005f;
-                point.nextHeight *= 0.99f;
-                //if (this.room.roomSettings.DangerType != RoomRain.DangerType.None)
-                //{
-                //    point.nextHeight += (float)Math.Lerp(-1f, 1f, UnityEngine.Random.value) * this.room.world.rainCycle.ScreenShake * this.room.roomSettings.RumbleIntensity;
-                //}
-                num7 += Water.Surface[num8, 0].height;
-                for (int num9 = 0; num9 < 2; num9++)
-                {
-                    float num10 = -(float)num8 * WaterData.TriangleSize / waveLength;
-                    Water.Surface[num8, num9].lastPos = Water.Surface[num8, num9].pos;
-                    float num11 = Water.Surface[num8, num9].height * 3f;
-                    float num12 = 3f;
-                    for (int num13 = -1; num13 < 2; num13 += 2)
+                    WaterData.SurfacePoint point = Water.Surface[num8, 0];
+                    if (num8 == 0)
                     {
-                        if (num8 + num13 * 2 > 0 && num8 + num13 * 2 < Water.Surface.GetLength(0) && (float)Math.Abs(Water.Surface[num8, num9].height - Water.Surface[num8 + num13, num9].height) > (float)Math.Abs(Water.Surface[num8, num9].height - Water.Surface[num8 + num13 * 2, num9].height))
-                        {
-                            num11 += Water.Surface[num8 + num13, num9].height;
-                            num12 += 1f;
-                        }
+                        point.nextHeight = (2f * point.height + (r - 1f) * point.lastHeight + 2f * (float)Math.Pow(r, 2f) * (Water.Surface[num8 + 1, 0].height - point.height)) / (1f + r);
                     }
-                    Water.Surface[num8, num9].pos = num11 / num12;
-                    Water.Surface[num8, num9].pos += (float)Math.Cos((num10 + Water.SinCounter * ((num9 != 1) ? -1f : 1f)) * MathF.Tau) * waveAmp;
+                    else if (num8 == Water.Surface.GetLength(0) - 1)
+                    {
+                        point.nextHeight = (2f * point.height + (r - 1f) * point.lastHeight + 2f * (float)Math.Pow(r, 2f) * (Water.Surface[num8 - 1, 0].height - point.height)) / (1f + r);
+                    }
+                    else
+                    {
+                        point.nextHeight = (float)Math.Pow(r, 2f) * (Water.Surface[num8 - 1, 0].height + Water.Surface[num8 + 1, 0].height) + 2f * (1f - (float)Math.Pow(r, 2f)) * point.height - point.lastHeight;
+                        //if (this.room.GetTile(point.defaultPos + new Vector2(0f, point.height)).Terrain == Room.Tile.TerrainType.Solid)
+                        //{
+                        //    point.nextHeight *= ((!this.room.waterInFrontOfTerrain) ? 0.75f : 0.95f);
+                        //}
+                    }
+                    point.nextHeight += MathHelper.Lerp(-waveAmp, waveAmp, (float)Random.Shared.NextDouble()) * 0.005f;
+                    point.nextHeight *= 0.99f;
                     //if (this.room.roomSettings.DangerType != RoomRain.DangerType.None)
                     //{
-                    //    Water.Surface[num8, num9].pos += Custom.DegToVec(UnityEngine.Random.value * 360f) * this.room.world.rainCycle.MicroScreenShake * 4f * this.room.roomSettings.RumbleIntensity;
+                    //    point.nextHeight += (float)Math.Lerp(-1f, 1f, UnityEngine.Random.value) * this.room.world.rainCycle.ScreenShake * this.room.roomSettings.RumbleIntensity;
                     //}
-                    Water.Surface[num8, num9].pos += (float)Math.Cos((num10 + Water.SinCounter * ((num9 != 1) ? 1f : -1f)) * MathF.Tau * rollBackLength) * waveAmp * rollBackAmp;
+                    num7 += Water.Surface[num8, 0].height;
+                    for (int num9 = 0; num9 < 2; num9++)
+                    {
+                        float num10 = -(float)num8 * WaterData.TriangleSize / waveLength;
+                        Water.Surface[num8, num9].lastPos = Water.Surface[num8, num9].pos;
+                        float num11 = Water.Surface[num8, num9].height * 3f;
+                        float num12 = 3f;
+                        for (int num13 = -1; num13 < 2; num13 += 2)
+                        {
+                            if (num8 + num13 * 2 > 0 && num8 + num13 * 2 < Water.Surface.GetLength(0) && (float)Math.Abs(Water.Surface[num8, num9].height - Water.Surface[num8 + num13, num9].height) > (float)Math.Abs(Water.Surface[num8, num9].height - Water.Surface[num8 + num13 * 2, num9].height))
+                            {
+                                num11 += Water.Surface[num8 + num13, num9].height;
+                                num12 += 1f;
+                            }
+                        }
+                        Water.Surface[num8, num9].pos = num11 / num12;
+                        Water.Surface[num8, num9].pos += (float)Math.Cos((num10 + Water.SinCounter * ((num9 != 1) ? -1f : 1f)) * MathF.Tau) * waveAmp;
+                        //if (this.room.roomSettings.DangerType != RoomRain.DangerType.None)
+                        //{
+                        //    Water.Surface[num8, num9].pos += Custom.DegToVec(UnityEngine.Random.value * 360f) * this.room.world.rainCycle.MicroScreenShake * 4f * this.room.roomSettings.RumbleIntensity;
+                        //}
+                        Water.Surface[num8, num9].pos += (float)Math.Cos((num10 + Water.SinCounter * ((num9 != 1) ? 1f : -1f)) * MathF.Tau * rollBackLength) * waveAmp * rollBackAmp;
+                    }
                 }
-            }
-            num7 /= Water.Surface.GetLength(0) * 1.5f;
-            for (int num14 = 0; num14 < Water.Surface.GetLength(0); num14++)
-            {
-                Water.Surface[num14, 0].lastHeight = Water.Surface[num14, 0].height;
-                float num15 = Water.Surface[num14, 0].nextHeight - num7;
-                if (num14 > 0 && num14 < Water.Surface.GetLength(0) - 1)
+                num7 /= Water.Surface.GetLength(0) * 1.5f;
+                for (int num14 = 0; num14 < Water.Surface.GetLength(0); num14++)
                 {
-                    num15 = MathHelper.Lerp(num15, MathHelper.Lerp(Water.Surface[num14 - 1, 0].nextHeight, Water.Surface[num14 + 1, 0].nextHeight, 0.5f), 0.01f);
+                    Water.Surface[num14, 0].lastHeight = Water.Surface[num14, 0].height;
+                    float num15 = Water.Surface[num14, 0].nextHeight - num7;
+                    if (num14 > 0 && num14 < Water.Surface.GetLength(0) - 1)
+                    {
+                        num15 = MathHelper.Lerp(num15, MathHelper.Lerp(Water.Surface[num14 - 1, 0].nextHeight, Water.Surface[num14 + 1, 0].nextHeight, 0.5f), 0.01f);
+                    }
+                    Water.Surface[num14, 0].height = MathHelper.Clamp(num15, -40f, 40f);
                 }
-                Water.Surface[num14, 0].height = MathHelper.Clamp(num15, -40f, 40f);
             }
+            // It throws nullref sometimes and I idk why
+            catch { }
         }
 
         public void Draw(Renderer renderer)
@@ -1046,7 +1055,7 @@ namespace RainMap
                 (
                     (FixedCameraPositions[i].X + texWidth / 2 - ScreenStart.X) / ScreenSize.X,
                     (FixedCameraPositions[i].Y + texHeight / 2 - ScreenStart.Y) / ScreenSize.Y,
-                    Settings?.FadePaletteValues?[i] ?? 0
+                    i < Settings?.FadePaletteValues?.Length ? Settings?.FadePaletteValues?[i] ?? 0 : 0
                 );
             }
             FadePosValCache.SetData(fadePosValColors, 0, CameraPositions.Length);

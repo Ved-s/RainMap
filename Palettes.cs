@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xna.Framework.Graphics;
+using RWAPI;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,8 +12,6 @@ namespace RainMap
     public static class Palettes
     {
         static List<Texture2D?> Pals = new();
-
-        static string[] Paths = Array.Empty<string>();
 
         public static Texture2D? GetPalette(int index)
         {
@@ -28,41 +27,12 @@ namespace RainMap
             while (Pals.Count <= index)
                 Pals.Add(null);
 
-            string palName = $"palette{index}.png";
+            string palName = $"palettes/palette{index}.png";
 
-            foreach (string path in Paths)
-            {
-                string fullPath = Path.Combine(path, palName);
-                if (File.Exists(fullPath))
-                {
-                    pal = Texture2D.FromFile(Main.Instance.GraphicsDevice, fullPath);
-                    break;
-                }
-            }
+            pal = RainWorldAPI.Assets?.FindTexture(palName);
 
             Pals[index] = pal;
             return pal;
-        }
-
-        public static void SearchPalettes(string path)
-        {
-            List<string> paths = new();
-
-            string basePals = Path.Combine(path, "palettes");
-            if (Directory.Exists(basePals))
-                paths.Add(basePals);
-
-            string mods = Path.Combine(path, "mods");
-
-            if (Directory.Exists(mods))
-                foreach (string mod in Directory.EnumerateDirectories(mods))
-                {
-                    string modPalettes = Path.Combine(mod, "palettes");
-                    if (Directory.Exists(modPalettes))
-                        paths.Add(modPalettes);
-                }
-
-            Paths = paths.ToArray();
         }
     }
 }

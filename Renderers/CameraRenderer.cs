@@ -34,7 +34,7 @@ namespace RainMap.Renderers
             float wheel = (state.ScrollWheelValue - WheelValue) / 120;
             WheelValue = state.ScrollWheelValue;
 
-            if (wheel == 0)
+            if (wheel == 0 || Interface.Hovered)
                 return;
 
             WheelZoom += Math.Sign(wheel) * (float)Math.Pow(2, Math.Abs(wheel));

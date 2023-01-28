@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using RainMap.Renderers;
 using RainMap.Structures;
+using RWAPI;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -22,22 +23,21 @@ namespace RainMap
 		public Color? BackgroundColor;
 		public string Id = null!;
 
-		public static Region Load(string path)
+		public static Region Load(MultiDirectory path, string id)
 		{
-			string regionId = Path.GetFileName(path);
-
-			Main.Instance.Window.Title = $"Loading region {regionId}";
+			Main.Instance.Window.Title = $"Loading region {id}";
 
 			Region region = new()
 			{
-				Id = regionId.ToUpper()
+				Id = id.ToUpper()
 			};
 
-			string[] worldLines = File.ReadAllLines(Path.Combine(path, $"world_{regionId}.txt"));
+			string[] worldLines = File.ReadAllLines(path.FindFile($"world_{id}.txt")!);
 
 			Dictionary<string, string?[]> connections = new();
 
-			string roomsDir = path + "-rooms";
+			MultiDirectory roomsDir = path.FindDirectory($"../{id}-rooms")!;
+			MultiDirectory gatesDir = path.FindDirectory($"../gates")!;
 
 			//Получение списка комнат и их соединений
 			for (int i = 0; i < worldLines.Length; i++)
@@ -77,14 +77,9 @@ namespace RainMap
 			int roomIndex = 0;
 			foreach (string roomName in connections.Keys)
 			{
-				string roomPath = roomName.StartsWith("GATE") ? Path.GetDirectoryName(path) + $"\\gates\\{roomName}.txt" : roomsDir + $"\\{roomName}.txt";
-
-				if (!File.Exists(roomPath))
-					continue;
-
 				Main.Instance.Window.Title = $"Loading room {roomName} ({roomIndex}/{connections.Count})";
 
-				Room room = Room.Load(roomPath);
+				Room room = Room.Load(roomName.StartsWith("GATE") ? gatesDir : roomsDir, roomName);
 				region.Rooms.Add(room);
 				roomIndex++;
 			}
@@ -118,8 +113,8 @@ namespace RainMap
 			}
 
 			//Применение свойств региона
-			string properties = Path.Combine(path, "properties.txt");
-			if (File.Exists(properties))
+			string? properties = path.FindFile("properties.txt");
+			if (properties is not null)
 			{
 				region.Properties = RegionProperties.Load(properties);
 
@@ -135,23 +130,23 @@ namespace RainMap
 			Dictionary<string, RoomSettings> templates = new();
 			foreach (Room room in region.Rooms)
 			{
-				string roomSettingsPath = Path.Combine(roomsDir, $"{room.Name}_settings.txt");
+				string? roomSettingsPath = roomsDir.FindFile($"{room.Name}_settings.txt");
 				room.Settings = null;
 
-				if (File.Exists(roomSettingsPath) == false)
+				if (roomSettingsPath is null)
 					continue;
 
 				RoomSettings settings = RoomSettings.Load(roomSettingsPath);
 				string? template = settings.Template;
 				if (template is null && region.Properties?.DefaultTemplate is not null)
-					template = $"{regionId}_settingstemplate_{region.Properties.DefaultTemplate}";
+					template = $"{id}_settingstemplate_{region.Properties.DefaultTemplate}";
 
 				if (template is not null && template != "NONE")
 				{
 					if (!templates.TryGetValue(template, out RoomSettings? templateSettings))
 					{
-						string templatePath = Path.Combine(path, $"{template}.txt");
-						if (File.Exists(templatePath))
+						string? templatePath = path.FindFile($"{template}.txt");
+						if (templatePath is not null)
 							templateSettings = RoomSettings.Load(templatePath);
 						else templateSettings = new();
 						templates[template] = templateSettings;
@@ -162,8 +157,8 @@ namespace RainMap
 			}
 
 			//Запись координат каждой комнаты на карте
-			string mapFile = Path.Combine(path, $"map_{regionId}.txt");
-			if (File.Exists(mapFile))
+			string? mapFile = path.FindFile($"map_{id}.txt");
+			if (mapFile is not null)
 			{
 				string[] mapLines = File.ReadAllLines(mapFile);
 
