@@ -142,10 +142,13 @@ namespace RainMap
                     if (solid)
                         gray = 0;
                     
-                    if (tile.Terrain == Tile.TerrainType.Floor)
+                    else if (tile.Terrain == Tile.TerrainType.Floor)
                         gray = 0.35f;
 
-                    if (walls && tile.Attributes.HasFlag(Tile.TileAttributes.WallBehind))
+                    else if (tile.Terrain == Tile.TerrainType.Slope)
+                        gray = .4f;
+
+                    else if (walls && tile.Attributes.HasFlag(Tile.TileAttributes.WallBehind))
                         gray = 0.75f;
 
                     if (tile.Attributes.HasFlag(Tile.TileAttributes.VerticalBeam) || tile.Attributes.HasFlag(Tile.TileAttributes.HorizontalBeam))

@@ -4,9 +4,6 @@ using Microsoft.Xna.Framework.Input;
 using RainMap.Renderers;
 using RainMap.Structures;
 using RWAPI;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -242,11 +239,11 @@ namespace RainMap
             GraphicsDevice.ScissorRectangle = new(0, 0, vp.Width, vp.Height);
             Projection = Matrix.CreateOrthographicOffCenter(0, vp.Width, vp.Height, 0, 0, 1);
 
-			GraphicsDevice.Clear(Region?.BackgroundColor ?? Microsoft.Xna.Framework.Color.CornflowerBlue);
+            GraphicsDevice.Clear(Region?.BackgroundColor ?? Microsoft.Xna.Framework.Color.CornflowerBlue);
 
-			DrawRoomSelection(SelectedRooms);
+            DrawRoomSelection(SelectedRooms);
 
-			MainTimeLogger.StartWatch(MainDrawTime.Region);
+            MainTimeLogger.StartWatch(MainDrawTime.Region);
 
             Region?.Draw(WorldCamera, RenderConnections);
 
@@ -361,21 +358,11 @@ namespace RainMap
                 WaterColor.Parameters["NoiseTex"]?.SetValue(Noise);
                 RoomColor.Parameters["EffectColors"]?.SetValue(EffectColors);
 
-                ThreadPool.QueueUserWorkItem((_) =>
-                {
-                    try
-                    {
-                        Region = Region.Load(path, id);
-                    }
-                    catch (Exception ex)
-                    {
-                        Window.Title = $"Caught an exception while loading region: {ex.Message}";
-                    }
-                });
+                Region = Region.Load(path, id);
             }
             catch (Exception ex)
             {
-                Window.Title = $"Caught an exception while loading assets: {ex.Message}";
+                System.Windows.Forms.MessageBox.Show($"{ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}", "Caught an exception while loading region");
             }
         }
 

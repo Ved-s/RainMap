@@ -79,8 +79,12 @@ namespace RainMap
 			{
 				Main.Instance.Window.Title = $"Loading room {roomName} ({roomIndex}/{connections.Count})";
 
-				Room room = Room.Load(roomName.StartsWith("GATE") ? gatesDir : roomsDir, roomName);
-				region.Rooms.Add(room);
+				try
+				{
+					Room room = Room.Load(roomName.StartsWith("GATE") ? gatesDir : roomsDir, roomName);
+					region.Rooms.Add(room);
+				}
+				catch { }
 				roomIndex++;
 			}
 
