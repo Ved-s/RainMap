@@ -4,6 +4,8 @@ using RainMap.UI;
 using RainMap.UI.Elements;
 using RainMap.UI.Structures;
 using RWAPI;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Png;
 using System;
 using System.IO;
 using System.Threading;
@@ -17,8 +19,8 @@ namespace RainMap
         static UIRoot Root = null!;
         static UIResizeablePanel SidePanel = null!;
 
-        static float CaptureScale = 1f;
-        static bool RenderTileWalls = true;
+        public static float CaptureScale = 1f;
+        public static bool RenderTileWalls = true;
 
         public static InterfacePage Page = InterfacePage.RegionSelect;
 
@@ -218,7 +220,7 @@ namespace RainMap
                 {
                     new UIList
                     {
-                        Height = new(-200, 1),
+                        Height = new(-150, 1),
 
                         ElementSpacing = 5,
                         Elements =
@@ -344,6 +346,19 @@ namespace RainMap
                                 Height = 18,
 
                                 Selectable = true,
+                                Selected = Main.MappingMode,
+                                Text = "Mapping mode",
+
+                                SelectedBackColor = Color.White,
+                                SelectedTextColor = Color.Black,
+
+                            }.OnEvent(UIElement.ClickEvent, (btn, _) => Main.Instance.SetMappingMode(btn.Selected)),
+
+                            new UIButton
+                            {
+                                Height = 18,
+
+                                Selectable = true,
                                 Selected = RenderTileWalls,
                                 Text = "Render tile walls",
 
@@ -352,7 +367,11 @@ namespace RainMap
                                 SelectedBackColor = Color.White,
                                 SelectedTextColor = Color.Black,
 
-                            }.OnEvent(UIElement.ClickEvent, (btn, _) => RenderTileWalls = btn.Selected),
+                            }.OnEvent(UIElement.ClickEvent, (btn, _) =>
+                            {
+                                RenderTileWalls = btn.Selected;
+                                Main.Instance.SetMappingMode(Main.MappingMode);
+                            }),
                         }
                     },
 
@@ -360,7 +379,7 @@ namespace RainMap
                     {
                         Height = 18,
 
-                        Top = new(-142, 1),
+                        Top = new(-112, 1),
 
                         Text = $"Object icons scale: {Main.PlacedObjectIconsScale:0.00}",
                         TextAlign = new(0, .5f)
@@ -368,7 +387,7 @@ namespace RainMap
                     new UIScrollBar
                     {
                         Height = 9,
-                        Top = new(-124, 1),
+                        Top = new(-94, 1),
 
                         BarPadding = new(-3, 0),
                         BarSize = 9,
@@ -389,7 +408,7 @@ namespace RainMap
                         Height = 18,
                         Width = new(-40, 1),
 
-                        Top = new(-108, 1),
+                        Top = new(-78, 1),
 
                         Text = $"Render scale: {CaptureScale:0.00}",
                         TextAlign = new(0, .5f)
@@ -400,7 +419,7 @@ namespace RainMap
                     {
                         Height = 18,
                         Width = 18,
-                        Top = new(-108, 1),
+                        Top = new(-78, 1),
                         Left = new(-23, 1, -1),
 
                         Text = "+",
@@ -412,7 +431,7 @@ namespace RainMap
                     {
                         Height = 18,
                         Width = 18,
-                        Top = new(-108, 1),
+                        Top = new(-78, 1),
                         Left = new(0, 1, -1),
 
                         Text = "-",
@@ -424,22 +443,12 @@ namespace RainMap
                     {
                         Height = 25,
 
-                        Top = new(-85, 1),
+                        Top = new(-55, 1),
                         TextAlign = new(.5f),
                         Text = "Render region rooms",
                         HoverText = "Render rooms separately into\nRegionRooms_XX folder\n(using selected render scale)",
 
                     }.OnEvent(UIElement.ClickEvent, RenderRegionRoomsClicked),
-                    new UIButton
-                    {
-                        Height = 25,
-
-                        Top = new(-55, 1),
-                        TextAlign = new(.5f),
-                        Text = "Render region room tiles",
-                        HoverText = "Render room tiles separately\ninto RegionRooms_XX_tiles)",
-
-                    }.OnEvent(UIElement.ClickEvent, RenderRegionRoomTilesClicked),
                     new UIButton
                     {
                         Height = 25,
@@ -457,21 +466,19 @@ namespace RainMap
         private static void RenderRegionRoomsClicked(UIButton button, Empty _)
         {
             if (Main.Region is not null)
-                CaptureManager.CaptureRegionRooms(Main.Region, CaptureScale, false, true);
-        }
-        private static void RenderRegionRoomTilesClicked(UIButton button, Empty _)
-        {
-            if (Main.Region is not null)
-                CaptureManager.CaptureRegionRooms(Main.Region, CaptureScale, true, RenderTileWalls);
+                CaptureManager.CaptureRegionRooms(Main.Region, CaptureScale);
         }
         private static void RenderEntireRegionClicked(UIButton button, Empty _)
         {
+            if (Main.Region is null)
+                return;
+
             string renderFile = null;
             Thread thd = new(() =>
             {
                 System.Windows.Forms.SaveFileDialog sfd = new();
                 sfd.Title = "Select render save file";
-                sfd.Filter = "TIFF Image|*.tiff";
+                sfd.Filter = Main.MappingMode ? "PNG Image|*.png" : "TIFF Image|*.tiff";
                 if (sfd.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                     renderFile = sfd.FileName;
             });
@@ -483,12 +490,14 @@ namespace RainMap
             {
                 var capResult = CaptureManager.CaptureEntireRegion(Main.Region, CaptureScale);
 
-                using FileStream fs = File.Create(renderFile);
-                Main.Instance.Window.Title = "Saving region capture";
-                capResult.Save(fs, new SixLabors.ImageSharp.Formats.Tiff.TiffEncoder()
+                IImageEncoder encoder = Main.MappingMode ? new PngEncoder() : new SixLabors.ImageSharp.Formats.Tiff.TiffEncoder()
                 {
                     Compression = SixLabors.ImageSharp.Formats.Tiff.Constants.TiffCompression.Deflate,
-                });
+                };
+
+                using FileStream fs = File.Create(renderFile);
+                Main.Instance.Window.Title = "Saving region capture";
+                capResult.Save(fs, encoder);
                 Main.Instance.Window.Title = "Freeing region capture";
                 capResult.Dispose();
                 GC.Collect();

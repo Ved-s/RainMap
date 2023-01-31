@@ -1,11 +1,16 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using RainMap.Renderers;
 using RainMap.Structures;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Advanced;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing.Processors.Normalization;
 using System;
+using System.Buffers;
 using System.IO;
+using Point = Microsoft.Xna.Framework.Point;
 
 namespace RainMap
 {
@@ -14,6 +19,9 @@ namespace RainMap
         public static Image<Rgba32> CaptureEntireRegion(Region region, float scale)
         {
             Main.Instance.Window.Title = "Starting region capture";
+
+            if (Main.MappingMode)
+                return CaptureRegionTileMap(region);
 
             Vector2 min = new(float.MaxValue);
             Vector2 max = Vector2.Zero;
@@ -75,9 +83,50 @@ namespace RainMap
             return image;
         }
 
-        public static void CaptureRegionRooms(Region region, float scale, bool tiles, bool tileWalls)
+        static Image<Rgba32> CaptureRegionTileMap(Region region)
         {
-            string dir = tiles ? $"RegionRender_{region.Id}_tiles" : $"RegionRender_{region.Id}";
+            Point tl = new Point(0, 0);
+            Point br = new Point(0, 0);
+
+            foreach (Room room in region.Rooms)
+            {
+                Point roomtl = (room.WorldPos / 20).ToPoint();
+                
+                tl.X = Math.Min(tl.X, roomtl.X);
+                tl.Y = Math.Min(tl.Y, roomtl.Y);
+
+                br.X = Math.Max(br.X, roomtl.X + room.Size.X);
+                br.Y = Math.Max(br.Y, roomtl.Y + room.Size.Y);
+            }
+
+            Image<Rgba32> image = new(br.X - tl.X, br.Y - tl.Y);
+
+            foreach (Room room in region.Rooms)
+            {
+                if (room.TileMap is null)
+                    room.ResetTileMap();
+
+                Rgba32[] colors = ArrayPool<Rgba32>.Shared.Rent(room.Size.X * room.Size.Y);
+
+                room.TileMap!.GetData(colors, 0, room.Size.X * room.Size.Y);
+
+                int drawPosX = (int)room.WorldPos.X / 20 - tl.X;
+                int drawPosY = (int)room.WorldPos.Y / 20 - tl.Y;
+
+                for (int j = 0; j < room.Size.Y; j++)
+                {
+                    Span<Rgba32> src = colors.AsSpan(j * room.Size.X, room.Size.X);
+                    Span<Rgba32> dst = image.DangerousGetPixelRowMemory(drawPosY + j).Span.Slice(drawPosX, room.Size.X);
+                    src.CopyTo(dst);
+                }
+            }
+
+            return image;
+        }
+
+        public static void CaptureRegionRooms(Region region, float scale)
+        {
+            string dir = Main.MappingMode ? $"RegionRender_{region.Id}_tiles" : $"RegionRender_{region.Id}";
 
             Directory.CreateDirectory(dir);
 
@@ -86,9 +135,9 @@ namespace RainMap
             {
                 Room room = region.Rooms[k];
                 Main.Instance.Window.Title = $"Rendering room {room.Name} ({k}/{region.Rooms.Count})";
-                Image<Rgba32> capturedRoom = tiles ? CaptureRoomTiles(room, tileWalls) : CaptureRoom(room, bg, scale);
+                Image<Rgba32> capturedRoom = CaptureRoom(room, bg, scale);
 
-                string fileName = $"{room.Name}{(Main.RenderRoomTiles && !tiles ? "_tiles" : "")}.png";
+                string fileName = $"{room.Name}{(Main.RenderRoomTiles && !Main.MappingMode ? "_tiles" : "")}.png";
                 string filePath = Path.Combine(dir, fileName);
 
                 using FileStream outputStream = File.Create(filePath);
@@ -100,6 +149,28 @@ namespace RainMap
 
         public static Image<Rgba32> CaptureRoom(Room room, Rgba32 bg, float scale)
         {
+            if (Main.MappingMode)
+            {
+                if (room.TileMap is null)
+                    room.ResetTileMap();
+
+                Rgba32[] buffer = ArrayPool<Rgba32>.Shared.Rent(room.Size.X * room.Size.Y);
+                room.TileMap!.GetData(buffer, 0, room.Size.X * room.Size.Y);
+
+                Image<Rgba32> map = new(room.Size.X, room.Size.Y);
+
+                for (int i = 0; i < room.Size.Y; i++)
+                {
+                    Span<Rgba32> src = buffer.AsSpan()
+                        .Slice(i * room.Size.X, room.Size.X);
+
+                    Span<Rgba32> dst = map.DangerousGetPixelRowMemory(i).Span;
+                    src.CopyTo(dst);
+                }
+
+                return map;
+            }
+
             Image<Rgba32> image = new((int)(room.ScreenSize.X * scale), (int)(room.ScreenSize.Y * scale), bg);
             CaptureRenderer renderer = new(image)
             {
@@ -123,59 +194,6 @@ namespace RainMap
             room.Rendered = true;
 
             renderer.Dispose();
-            return image;
-        }
-
-        public static Image<Rgba32> CaptureRoomTiles(Room room, bool walls)
-        {
-            Image<Rgba32> image = new(room.Size.X, room.Size.Y);
-
-            for (int j = 0; j < room.Size.Y; j++)
-                for (int i = 0; i < room.Size.X; i++)
-                {
-                    Tile tile = room.GetTile(i, j);
-
-                    float gray = 1;
-
-                    bool solid = tile.Terrain == Tile.TerrainType.Solid;
-
-                    if (solid)
-                        gray = 0;
-                    
-                    else if (tile.Terrain == Tile.TerrainType.Floor)
-                        gray = 0.35f;
-
-                    else if (tile.Terrain == Tile.TerrainType.Slope)
-                        gray = .4f;
-
-                    else if (walls && tile.Attributes.HasFlag(Tile.TileAttributes.WallBehind))
-                        gray = 0.75f;
-
-                    if (tile.Attributes.HasFlag(Tile.TileAttributes.VerticalBeam) || tile.Attributes.HasFlag(Tile.TileAttributes.HorizontalBeam))
-                        gray = 0.35f;
-
-                    byte b = (byte)(gray * 255);
-
-                    Rgba32 color = new(b, b, b);
-
-                    if ((room.WaterInFrontOfTerrain || !solid) && j >= room.Size.Y - room.WaterLevel)
-                    {
-                        Rgba32 waterColor = new(0, 0, 200, 100);
-
-                        float v = waterColor.A / 255f;
-                        float uv = 1 - v;
-
-                        color.R = (byte)(uv * color.R + v * waterColor.R);
-                        color.G = (byte)(uv * color.G + v * waterColor.G);
-                        color.B = (byte)(uv * color.B + v * waterColor.B);
-                    }
-
-                    image[i, j] = color;
-                }
-
-            foreach (Microsoft.Xna.Framework.Point p in room.RoomExits)
-                image[p.X, p.Y] = new(255, 0, 0);
-
             return image;
         }
     }

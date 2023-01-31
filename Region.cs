@@ -303,6 +303,9 @@ namespace RainMap
 					Vector2 lineA = Bezier.CalcCubicBezier0(a, b, c, d, MathHelper.Clamp(t + MathHelper.Lerp(tLastOff.Value, tOff, 0.75f), 0, 1));
 					Vector2 lineB = Bezier.CalcCubicBezier0(a, b, c, d, MathHelper.Clamp(tNext + tOff, 0, 1));
 
+					if (Main.MappingMode)
+						renderer.DrawLine(lineA, lineB, Color.Black, 5);
+
 					renderer.DrawLine(lineA, lineB, Color.White, 2);
 				}
 				t = tNext;

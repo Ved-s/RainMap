@@ -46,6 +46,8 @@ namespace RainMap
         public WaterData? Water;
         public bool Rendered;
 
+        public Texture2D? TileMap;
+
         Texture2D? FadePosValCache = null;
         Vector2[] FixedCameraPositions = null!;
         bool DoneFullScreenUpdate = false;
@@ -447,19 +449,22 @@ namespace RainMap
             if (!IntersectsWith(rendererTL, rendererBR))
                 return;
 
-            PrepareDraw();
+            if (Main.MappingMode)
+            {
+                if (TileMap is null)
+                    ResetTileMap();
+                Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
+                renderer.DrawTexture(TileMap!, WorldPos, null, Size.ToVector2() * 20);
+                Main.SpriteBatch.End();
+            }
+            else
+            {
+                PrepareDraw();
 
-            for (int i = 0; i < CameraScreens.Length; i++)
-                if (ScreenIntersectsWith(i, rendererTL, rendererBR))
-                    DrawScreen(renderer, i);
-
-            Main.SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
-            Vector2 nameSize = Main.Consolas10.MeasureString(Name);
-            Vector2 namePos = renderer.TransformVector(WorldPos + ScreenStart + new Vector2(ScreenSize.X / 2, 0)) - new Vector2(nameSize.X / 2, 0);
-            Main.SpriteBatch.DrawStringShaded(Main.Consolas10, Name, namePos, Color.Yellow);
-
-            Main.SpriteBatch.End();
-
+                for (int i = 0; i < CameraScreens.Length; i++)
+                    if (ScreenIntersectsWith(i, rendererTL, rendererBR))
+                        DrawScreen(renderer, i);
+            }
             Rendered = true;
         }
         public void PrepareDraw()
@@ -1060,6 +1065,55 @@ namespace RainMap
             }
             FadePosValCache.SetData(fadePosValColors, 0, CameraPositions.Length);
             ArrayPool<Color>.Shared.Return(fadePosValColors);
+        }
+
+        public void ResetTileMap()
+        {
+            Color[] colors = new Microsoft.Xna.Framework.Color[Size.X * Size.Y];
+
+            for (int j = 0; j < Size.Y; j++)
+                for (int i = 0; i < Size.X; i++)
+                {
+                    Tile tile = GetTile(i, j);
+
+                    float gray = 1;
+
+                    bool solid = tile.Terrain == Tile.TerrainType.Solid;
+
+                    if (solid)
+                        gray = 0;
+
+                    else if (tile.Terrain == Tile.TerrainType.Floor)
+                        gray = 0.35f;
+
+                    else if (tile.Terrain == Tile.TerrainType.Slope)
+                        gray = .4f;
+
+                    else if (Interface.RenderTileWalls && tile.Attributes.HasFlag(Tile.TileAttributes.WallBehind))
+                        gray = 0.75f;
+
+                    if (tile.Attributes.HasFlag(Tile.TileAttributes.VerticalBeam) || tile.Attributes.HasFlag(Tile.TileAttributes.HorizontalBeam))
+                        gray = 0.35f;
+
+                    byte b = (byte)(gray * 255);
+
+                    Color color = new(b, b, b);
+
+                    if ((WaterInFrontOfTerrain || !solid) && j >= Size.Y - WaterLevel)
+                    {
+                        Color waterColor = new(0, 0, 200);
+
+                        color = Color.Lerp(color, waterColor, 0.4f);
+                    }
+
+                    colors[i + j * Size.X] = color;
+                }
+
+            foreach (Point p in RoomExits)
+                colors[p.X + p.Y * Size.X] = new(255, 0, 0);
+
+            TileMap ??= new(Main.Instance.GraphicsDevice, Size.X, Size.Y);
+            TileMap.SetData(colors);
         }
 
         public Vector2 GetExitDirection(int index)

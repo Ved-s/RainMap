@@ -31,6 +31,7 @@ namespace RainMap
         public static Texture2D? EffectColors;
         public static Texture2D Pixel = null!;
         public static Texture2D Transparent = null!;
+        public static Texture2D Grid = null!;
 
         public static Region? Region;
         public static Matrix Projection;
@@ -51,8 +52,9 @@ namespace RainMap
         public static bool RenderRoomTiles = false;
         public static bool DrawObjectNames = false;
         public static bool DrawObjectIcons = false;
-        public static bool DrawInfo = true;
+        public static bool DrawInfo = false;
         public static bool UseParallax = false;
+        public static bool MappingMode = false;
 
         public static float PlacedObjectIconsScale = 1f;
 
@@ -98,6 +100,7 @@ namespace RainMap
             WaterSurface = Content.Load<Effect>("WaterSurface");
             LightSource = Content.Load<Effect>("LightSource");
             Consolas10 = Content.Load<SpriteFont>("Consolas10");
+            Grid = Content.Load<Texture2D>("Grid");
 
             Pixel = new(GraphicsDevice, 1, 1);
             Pixel.SetData(new[] { Microsoft.Xna.Framework.Color.White });
@@ -213,6 +216,10 @@ namespace RainMap
 
                 Dragging = false;
                 Selecting = false;
+
+                if (MappingMode && SelectedRooms.Count > 0)
+                    foreach (Room r in SelectedRooms)
+                        r.WorldPos = new Vector2((int)r.WorldPos.X / 20, (int)r.WorldPos.Y / 20) * 20;
             }
 
             if (IsActive)
@@ -273,6 +280,32 @@ namespace RainMap
                 SpriteBatch.End();
             }
 
+            if (MappingMode && WorldCamera.Scale > 0.45)
+            {
+                float gridScale = WorldCamera.Scale;
+
+                SpriteBatch.Begin(samplerState: gridScale < 1 ? SamplerState.LinearWrap : SamplerState.PointWrap);
+
+                Vector2 offset = new Vector2(WorldCamera.Position.X % 20, WorldCamera.Position.Y % 20) * WorldCamera.Scale + Grid.Size() * 2 * gridScale;
+                Vector2 sourceSize = (GraphicsDevice.Viewport.Bounds.Size.ToVector2() + Grid.Size()) / gridScale + offset;
+
+                SpriteBatch.Draw(Grid, -offset, new Rectangle(0, 0, (int)sourceSize.X, (int)sourceSize.Y), new Color(128, 128, 128) * 0.5f, 0f, Vector2.Zero, gridScale, SpriteEffects.None, 0f);
+                SpriteBatch.End();
+            }
+
+            if (Region is not null)
+            {
+                SpriteBatch.Begin(samplerState: SamplerState.PointClamp);
+
+                foreach (Room room in Region.Rooms)
+                {
+                    Vector2 nameSize = Main.Consolas10.MeasureString(room.Name);
+                    Vector2 namePos = WorldCamera.TransformVector(room.WorldPos + room.ScreenStart + new Vector2(room.ScreenSize.X / 2, 0)) - new Vector2(nameSize.X / 2, 0);
+                    Main.SpriteBatch.DrawStringShaded(Main.Consolas10, room.Name, namePos, Color.Yellow);
+                }
+                SpriteBatch.End();
+            }
+
             Interface.Draw();
 
             if (DrawInfo)
@@ -285,13 +318,19 @@ namespace RainMap
 
             foreach (Room r in SelectedRooms)
             {
-                for (int i = 0; i < r.CameraScreens.Length; i++)
-                {
-                    TextureAsset? screenTex = r.CameraScreens[i];
-                    if (screenTex?.Loaded is null or false)
-                        continue;
+                if (MappingMode)
+                    WorldCamera.DrawRect(r.WorldPos - new Vector2(2) / WorldCamera.Scale, r.Size.ToVector2() * 20 + new Vector2(4) / WorldCamera.Scale, Color.White * 0.4f);
 
-                    WorldCamera.DrawRect(r.WorldPos + r.CameraPositions[i] - new Vector2(2) / WorldCamera.Scale, screenTex.Texture.Size() + new Vector2(4) / WorldCamera.Scale, Microsoft.Xna.Framework.Color.White * 0.4f);
+                else
+                {
+                    for (int i = 0; i < r.CameraScreens.Length; i++)
+                    {
+                        TextureAsset? screenTex = r.CameraScreens[i];
+                        if (screenTex?.Loaded is null or false)
+                            continue;
+
+                        WorldCamera.DrawRect(r.WorldPos + r.CameraPositions[i] - new Vector2(2) / WorldCamera.Scale, screenTex.Texture.Size() + new Vector2(4) / WorldCamera.Scale, Color.White * 0.4f);
+                    }
                 }
             }
 
@@ -359,10 +398,25 @@ namespace RainMap
                 RoomColor.Parameters["EffectColors"]?.SetValue(EffectColors);
 
                 Region = Region.Load(path, id);
+                SetMappingMode(MappingMode);
             }
             catch (Exception ex)
             {
                 System.Windows.Forms.MessageBox.Show($"{ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}", "Caught an exception while loading region");
+            }
+        }
+
+        public void SetMappingMode(bool mode)
+        {
+            MappingMode = mode;
+
+            if (MappingMode && Region is not null)
+            {
+                foreach (Room r in Region.Rooms)
+                {
+                    r.WorldPos = new Vector2((int)r.WorldPos.X / 20, (int)r.WorldPos.Y / 20) * 20;
+                    r.ResetTileMap();
+                }
             }
         }
 

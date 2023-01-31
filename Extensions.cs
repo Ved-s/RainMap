@@ -55,7 +55,7 @@ namespace RainMap
         {
             Vector2 diff = b - a;
             float angle = MathF.Atan2(diff.Y, diff.X);
-            spriteBatch.Draw(Main.Pixel, a, null, color, angle, new Vector2(0, thickness / 4), new Vector2(diff.Length(), thickness), SpriteEffects.None, 0);
+            spriteBatch.Draw(Main.Pixel, a, null, color, angle, new Vector2(0, .5f), new Vector2(diff.Length(), thickness), SpriteEffects.None, 0);
         }
 
         public static void DrawRect(this SpriteBatch spriteBatch, Vector2 pos, Vector2 size, Color? fill, Color? border = null, float thickness = 1)
